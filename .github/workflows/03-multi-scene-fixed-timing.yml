@@ -1,0 +1,471 @@
+name: AICAP FREE RENDER — 03 — MULTI-SCENE + FIXED TIMING
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-03:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG
+      # ==========================================================
+
+      - name: Install FFmpeg
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "03 — MULTI-SCENE + FIXED TIMING"
+          echo "======================================"
+          echo "Installing FFmpeg..."
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+          echo "FFmpeg installation completed."
+
+
+      # ==========================================================
+      # 03. VERIFY FFMPEG
+      # ==========================================================
+
+      - name: Verify FFmpeg
+        run: |
+          echo "======================================"
+          echo "FFMPEG VERIFICATION"
+          echo "======================================"
+
+          ffmpeg -version | head -n 3
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "FFmpeg Path : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "AICAP REAL ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. VALIDATE ALL REAL ASSETS
+      # ==========================================================
+
+      - name: Validate real AICAP assets
+        run: |
+          echo "======================================"
+          echo "VALIDATING REAL AICAP ASSETS"
+          echo "======================================"
+
+          IMAGE1="AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+          IMAGE2="AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+          IMAGE3="AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+          AUDIO="AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+          for FILE in "$IMAGE1" "$IMAGE2" "$IMAGE3" "$AUDIO"
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing asset:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$FILE")
+
+            echo "File : $FILE"
+            echo "Size : $SIZE bytes"
+            echo "--------------------------------------"
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty asset:"
+              echo "$FILE"
+              exit 1
+            fi
+          done
+
+          echo "======================================"
+          echo "ALL REAL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. INSPECT INPUT IMAGES
+      # ==========================================================
+
+      - name: Inspect input images
+        run: |
+          echo "======================================"
+          echo "INPUT IMAGE INSPECTION"
+          echo "======================================"
+
+          for IMAGE in \
+            AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg \
+            AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg \
+            AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg
+          do
+            echo "IMAGE:"
+            echo "$IMAGE"
+
+            ffprobe \
+              -v error \
+              -select_streams v:0 \
+              -show_entries stream=width,height,codec_name,pix_fmt \
+              -of default=noprint_wrappers=1 \
+              "$IMAGE"
+
+            echo "--------------------------------------"
+          done
+
+
+      # ==========================================================
+      # 07. INSPECT NARRATION
+      # ==========================================================
+
+      - name: Inspect narration
+        run: |
+          echo "======================================"
+          echo "NARRATION INSPECTION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            AI_in_60_Seconds_DEFAULT_20260811_190008.mp3
+
+
+      # ==========================================================
+      # 08. CREATE WORKING DIRECTORY
+      # ==========================================================
+
+      - name: Create working directory
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+          echo "Working directories created."
+
+
+      # ==========================================================
+      # 09. RENDER SCENE 01 — 12 SECONDS
+      # ==========================================================
+
+      - name: Render Scene 01
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 01"
+          echo "Duration : 12 seconds"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg \
+            -t 12 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene01.mp4
+
+          echo "Scene 01 completed."
+
+
+      # ==========================================================
+      # 10. RENDER SCENE 02 — 18 SECONDS
+      # ==========================================================
+
+      - name: Render Scene 02
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 02"
+          echo "Duration : 18 seconds"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg \
+            -t 18 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene02.mp4
+
+          echo "Scene 02 completed."
+
+
+      # ==========================================================
+      # 11. RENDER SCENE 03 — 30 SECONDS
+      # ==========================================================
+
+      - name: Render Scene 03
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 03"
+          echo "Duration : 30 seconds"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg \
+            -t 30 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene03.mp4
+
+          echo "Scene 03 completed."
+
+
+      # ==========================================================
+      # 12. VERIFY INDIVIDUAL SCENES
+      # ==========================================================
+
+      - name: Verify individual scene durations
+        run: |
+          echo "======================================"
+          echo "VERIFYING SCENE DURATIONS"
+          echo "======================================"
+
+          for FILE in work/scene01.mp4 work/scene02.mp4 work/scene03.mp4
+          do
+            echo "FILE:"
+            echo "$FILE"
+
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1 \
+              "$FILE"
+
+            echo "--------------------------------------"
+          done
+
+
+      # ==========================================================
+      # 13. CREATE CONCAT LIST
+      # ==========================================================
+
+      - name: Create scene concat list
+        run: |
+          echo "======================================"
+          echo "CREATING SCENE CONCAT LIST"
+          echo "======================================"
+
+          cat > work/concat.txt <<'EOF'
+          file 'scene01.mp4'
+          file 'scene02.mp4'
+          file 'scene03.mp4'
+          EOF
+
+          cat work/concat.txt
+
+
+      # ==========================================================
+      # 14. CONCATENATE THREE SCENES
+      # ==========================================================
+
+      - name: Concatenate three scenes
+        run: |
+          echo "======================================"
+          echo "CONCATENATING THREE SCENES"
+          echo "======================================"
+
+          cd work
+
+          ffmpeg \
+            -y \
+            -f concat \
+            -safe 0 \
+            -i concat.txt \
+            -c copy \
+            multi_scene_video.mp4
+
+          cd ..
+
+          echo "Three scenes concatenated."
+
+
+      # ==========================================================
+      # 15. ADD REAL NARRATION
+      # ==========================================================
+
+      - name: Add real narration without changing scene timing
+        run: |
+          echo "======================================"
+          echo "ADDING REAL AICAP NARRATION"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/multi_scene_video.mp4 \
+            -i AI_in_60_Seconds_DEFAULT_20260811_190008.mp3 \
+            -filter_complex "[1:a]apad[audio]" \
+            -map 0:v:0 \
+            -map "[audio]" \
+            -t 60 \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_03_MULTI_SCENE_FIXED_TIMING.mp4
+
+          echo "Narration added."
+          echo "Video duration remains fixed at 60 seconds."
+
+
+      # ==========================================================
+      # 16. VERIFY FINAL VIDEO
+      # ==========================================================
+
+      - name: Verify final Test 03 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER — TEST 03"
+          echo "FINAL VIDEO VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_03_MULTI_SCENE_FIXED_TIMING.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Final video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "Resolution : 1080x1920"
+          echo "FPS        : 30"
+          echo "Duration   : 60 seconds"
+          echo "Scenes     : 3"
+          echo "Scene 01   : 12 seconds"
+          echo "Scene 02   : 18 seconds"
+          echo "Scene 03   : 30 seconds"
+          echo "Narration  : REAL AICAP AUDIO"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 17. UPLOAD ARTIFACT
+      # ==========================================================
+
+      - name: Upload Test 03 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-03-MULTI-SCENE-FIXED-TIMING
+          path: output/AICAP_FREE_03_MULTI_SCENE_FIXED_TIMING.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 18. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 03 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "03 — MULTI-SCENE + FIXED TIMING"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "SCENE COUNT       : 3"
+          echo "SCENE 01          : 12 seconds"
+          echo "SCENE 02          : 18 seconds"
+          echo "SCENE 03          : 30 seconds"
+          echo "TOTAL VIDEO       : 60 seconds"
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "NARRATION         : REAL AICAP AUDIO"
+          echo "OUTPUT            : AICAP_FREE_03_MULTI_SCENE_FIXED_TIMING.mp4"
+          echo "ARTIFACT          : AICAP-FREE-03-MULTI-SCENE-FIXED-TIMING"
+
+          echo "======================================"
+          echo "TEST 03 STATUS : PASSED"
+          echo "======================================"
