@@ -1,4 +1,4 @@
-name: AICAP Free Video Renderer - Test 01
+name: AICAP Free Video Renderer - Test 02
 
 on:
   workflow_dispatch:
@@ -16,6 +16,7 @@ jobs:
         run: |
           echo "======================================"
           echo "AICAP FREE VIDEO RENDERER"
+          echo "TEST 02"
           echo "INSTALLING FFMPEG"
           echo "======================================"
 
@@ -40,105 +41,194 @@ jobs:
             exit 1
           fi
 
-      - name: Create AICAP test image
+      - name: Validate AICAP real assets
         run: |
           echo "======================================"
-          echo "CREATING TEST IMAGE"
+          echo "VALIDATING REAL AICAP ASSETS"
           echo "======================================"
 
-          mkdir -p input
+          IMAGE="AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+          AUDIO="AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+          if [ ! -f "$IMAGE" ]; then
+            echo "ERROR: Image not found:"
+            echo "$IMAGE"
+            exit 1
+          fi
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: Narration not found:"
+            echo "$AUDIO"
+            exit 1
+          fi
+
+          IMAGE_SIZE=$(stat -c%s "$IMAGE")
+          AUDIO_SIZE=$(stat -c%s "$AUDIO")
+
+          echo "Image File : $IMAGE"
+          echo "Image Size : $IMAGE_SIZE bytes"
+
+          echo "Audio File : $AUDIO"
+          echo "Audio Size : $AUDIO_SIZE bytes"
+
+          if [ "$IMAGE_SIZE" -le 0 ]; then
+            echo "ERROR: Image file is empty."
+            exit 1
+          fi
+
+          if [ "$AUDIO_SIZE" -le 0 ]; then
+            echo "ERROR: Audio file is empty."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "REAL ASSET VALIDATION : PASSED"
+          echo "======================================"
+
+      - name: Inspect real AICAP image
+        run: |
+          echo "======================================"
+          echo "INSPECTING AICAP IMAGE"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=width,height,pix_fmt,codec_name \
+            -of default=noprint_wrappers=1 \
+            AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg
+
+      - name: Inspect real AICAP narration
+        run: |
+          echo "======================================"
+          echo "INSPECTING AICAP NARRATION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            AI_in_60_Seconds_DEFAULT_20260811_190008.mp3
+
+      - name: Render Test 02
+        run: |
+          echo "======================================"
+          echo "AICAP FREE VIDEO RENDERER"
+          echo "TEST 02"
+          echo "REAL IMAGE + REAL NARRATION"
+          echo "======================================"
+
           mkdir -p output
 
           ffmpeg \
             -y \
-            -f lavfi \
-            -i "color=c=black:s=1080x1920" \
-            -frames:v 1 \
-            input/AICAP_TEST_IMAGE.png
-
-          echo "Test image created:"
-          ls -lh input/AICAP_TEST_IMAGE.png
-
-      - name: Render 15 second AICAP video
-        run: |
-          echo "======================================"
-          echo "AICAP FREE VIDEO RENDER"
-          echo "======================================"
-
-          ffmpeg \
-            -y \
             -loop 1 \
-            -i input/AICAP_TEST_IMAGE.png \
+            -i AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg \
+            -i AI_in_60_Seconds_DEFAULT_20260811_190008.mp3 \
             -t 15 \
             -r 30 \
             -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -map 0:v:0 \
+            -map 1:a:0 \
             -c:v libx264 \
             -preset veryfast \
             -pix_fmt yuv420p \
+            -c:a aac \
+            -b:a 192k \
+            -shortest \
             -movflags +faststart \
-            output/AICAP_FREE_TEST_01.mp4
+            output/AICAP_FREE_TEST_02_IMAGE_NARRATION.mp4
 
           echo "======================================"
-          echo "VIDEO RENDER COMPLETED"
+          echo "TEST 02 RENDER COMPLETED"
           echo "======================================"
 
-          ls -lh output/AICAP_FREE_TEST_01.mp4
+          ls -lh output/AICAP_FREE_TEST_02_IMAGE_NARRATION.mp4
 
-      - name: Verify rendered video
+      - name: Verify Test 02 video
         run: |
           echo "======================================"
-          echo "VERIFYING OUTPUT VIDEO"
+          echo "VERIFYING TEST 02 VIDEO"
           echo "======================================"
 
-          if [ ! -f output/AICAP_FREE_TEST_01.mp4 ]; then
-            echo "ERROR: MP4 file was not created."
+          VIDEO="output/AICAP_FREE_TEST_02_IMAGE_NARRATION.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Test 02 MP4 was not created."
             exit 1
           fi
 
-          FILE_SIZE=$(stat -c%s output/AICAP_FREE_TEST_01.mp4)
+          FILE_SIZE=$(stat -c%s "$VIDEO")
 
-          echo "Output File : AICAP_FREE_TEST_01.mp4"
-          echo "File Size   : ${FILE_SIZE} bytes"
+          echo "Output File : $VIDEO"
+          echo "File Size   : $FILE_SIZE bytes"
 
           if [ "$FILE_SIZE" -le 0 ]; then
             echo "ERROR: Output file is empty."
             exit 1
           fi
 
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
           ffprobe \
             -v error \
             -select_streams v:0 \
-            -show_entries stream=width,height,r_frame_rate,codec_name \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
             -of default=noprint_wrappers=1 \
-            output/AICAP_FREE_TEST_01.mp4
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
 
           ffprobe \
             -v error \
-            -show_entries format=duration \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
             -of default=noprint_wrappers=1 \
-            output/AICAP_FREE_TEST_01.mp4
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
 
           echo "======================================"
-          echo "VIDEO VERIFICATION : PASSED"
+          echo "TEST 02 VIDEO VERIFICATION : PASSED"
           echo "======================================"
 
-      - name: Upload rendered MP4 as GitHub artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Test 02 MP4
+        uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-TEST-01-VIDEO
-          path: output/AICAP_FREE_TEST_01.mp4
+          name: AICAP-FREE-TEST-02-IMAGE-NARRATION
+          path: output/AICAP_FREE_TEST_02_IMAGE_NARRATION.mp4
           retention-days: 1
 
-      - name: Final test result
+      - name: Final Test 02 result
         run: |
           echo "======================================"
-          echo "AICAP FREE VIDEO RENDERER TEST 01"
+          echo "AICAP FREE VIDEO RENDERER"
+          echo "TEST 02 FINAL"
           echo "======================================"
+
           echo "Status       : PASSED"
+          echo "Image        : REAL AICAP IMAGE"
+          echo "Narration    : REAL AICAP AUDIO"
           echo "Resolution   : 1080x1920"
           echo "FPS          : 30"
           echo "Duration     : 15 seconds"
-          echo "Codec        : H.264"
-          echo "Audio        : NONE"
-          echo "Output       : AICAP_FREE_TEST_01.mp4"
+          echo "Video Codec  : H.264"
+          echo "Audio Codec  : AAC"
+          echo "Output       : AICAP_FREE_TEST_02_IMAGE_NARRATION.mp4"
+
+          echo "======================================"
+          echo "TEST STATUS : PASSED"
           echo "======================================"
