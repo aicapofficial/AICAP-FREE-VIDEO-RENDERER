@@ -10,15 +10,29 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Install FFmpeg
+        run: |
+          echo "======================================"
+          echo "AICAP FREE VIDEO RENDERER"
+          echo "INSTALLING FFMPEG"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+          echo "======================================"
+          echo "FFMPEG INSTALLATION COMPLETE"
+          echo "======================================"
 
       - name: Show FFmpeg version
         run: |
           echo "======================================"
-          echo "AICAP FREE VIDEO RENDERER"
+          echo "FFMPEG VERSION"
           echo "======================================"
-          echo "FFmpeg version:"
-          ffmpeg -version | head -n 1
+
+          ffmpeg -version | head -n 3
 
       - name: Verify FFmpeg
         run: |
@@ -39,11 +53,16 @@ jobs:
           echo "======================================"
           echo "AICAP RENDERER ENVIRONMENT"
           echo "======================================"
-          echo "Operating System : $(uname -a)"
+
+          echo "Operating System:"
+          uname -a
+
           echo "CPU Information:"
           nproc
+
           echo "Disk Space:"
           df -h /
+
           echo "======================================"
           echo "ENVIRONMENT TEST : PASSED"
           echo "======================================"
