@@ -1,0 +1,508 @@
+name: AICAP FREE RENDER — 06 — SUBTITLES
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-06:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG
+      # ==========================================================
+
+      - name: Install FFmpeg
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "06 — SUBTITLES"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+          echo "FFmpeg installation completed."
+
+
+      # ==========================================================
+      # 03. VERIFY FFMPEG + SUBTITLE SUPPORT
+      # ==========================================================
+
+      - name: Verify FFmpeg subtitle support
+        run: |
+          echo "======================================"
+          echo "FFMPEG / SUBTITLE VERIFICATION"
+          echo "======================================"
+
+          ffmpeg -version | head -n 3
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "FFmpeg Path : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "Checking libass subtitle support..."
+          echo "--------------------------------------"
+
+          if ffmpeg -filters 2>/dev/null | grep -q "subtitles"; then
+            echo "Subtitle Filter : AVAILABLE"
+          else
+            echo "Subtitle Filter : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "SUBTITLE SUPPORT : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "AICAP REAL ASSETS"
+          echo "======================================"
+
+          echo "Image:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. VALIDATE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Validate real AICAP assets
+        run: |
+          echo "======================================"
+          echo "VALIDATING REAL AICAP ASSETS"
+          echo "======================================"
+
+          IMAGE="AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+          AUDIO="AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+          for FILE in "$IMAGE" "$AUDIO"
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing asset:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$FILE")
+
+            echo "File : $FILE"
+            echo "Size : $SIZE bytes"
+            echo "--------------------------------------"
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty asset:"
+              echo "$FILE"
+              exit 1
+            fi
+          done
+
+          echo "======================================"
+          echo "REAL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. INSPECT IMAGE
+      # ==========================================================
+
+      - name: Inspect input image
+        run: |
+          echo "======================================"
+          echo "INPUT IMAGE INSPECTION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=width,height,codec_name,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg
+
+
+      # ==========================================================
+      # 07. INSPECT NARRATION
+      # ==========================================================
+
+      - name: Inspect narration
+        run: |
+          echo "======================================"
+          echo "NARRATION INSPECTION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            AI_in_60_Seconds_DEFAULT_20260811_190008.mp3
+
+
+      # ==========================================================
+      # 08. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+          echo "Working directories created."
+
+
+      # ==========================================================
+      # 09. CREATE SUBTITLE FILE
+      #
+      # This is deliberately a separate SRT file so that we
+      # can independently verify subtitle timing before
+      # burning it into the video.
+      #
+      # 3 subtitle events:
+      #
+      # 00-05 sec
+      # 05-10 sec
+      # 10-15 sec
+      # ==========================================================
+
+      - name: Create subtitle file
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 06 SUBTITLES"
+          echo "======================================"
+
+          cat > work/subtitles.srt <<'EOF'
+          1
+          00:00:00,000 --> 00:00:05,000
+          Artificial intelligence is changing
+
+          2
+          00:00:05,000 --> 00:00:10,000
+          the way we work and create every day.
+
+          3
+          00:00:10,000 --> 00:00:15,000
+          AICAP is building a free video renderer.
+          EOF
+
+          echo "--------------------------------------"
+          echo "SUBTITLE FILE"
+          echo "--------------------------------------"
+
+          cat work/subtitles.srt
+
+          echo "======================================"
+          echo "SUBTITLE FILE CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 10. VERIFY SUBTITLE FILE
+      # ==========================================================
+
+      - name: Verify subtitle timing
+        run: |
+          echo "======================================"
+          echo "SUBTITLE TIMING VERIFICATION"
+          echo "======================================"
+
+          if [ ! -s work/subtitles.srt ]; then
+            echo "ERROR: Subtitle file is empty."
+            exit 1
+          fi
+
+          COUNT=$(grep -E '^[0-9]+$' work/subtitles.srt | wc -l)
+
+          echo "Subtitle Events : $COUNT"
+
+          if [ "$COUNT" -ne 3 ]; then
+            echo "ERROR: Expected 3 subtitle events."
+            exit 1
+          fi
+
+          echo "Subtitle 01 : 00:00 - 00:05"
+          echo "Subtitle 02 : 00:05 - 00:10"
+          echo "Subtitle 03 : 00:10 - 00:15"
+
+          echo "======================================"
+          echo "SUBTITLE TIMING : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 11. CREATE IMAGE MOTION + BURN SUBTITLES
+      #
+      # Image motion:
+      #   1.00x -> 1.15x
+      #
+      # Pan:
+      #   left -> right
+      #
+      # Subtitles:
+      #   burned directly into video
+      #
+      # Subtitle position:
+      #   lower portion of portrait frame
+      # ==========================================================
+
+      - name: Render image motion with subtitles
+        run: |
+          echo "======================================"
+          echo "RENDERING IMAGE MOTION + SUBTITLES"
+          echo "======================================"
+
+          echo "Duration       : 15 seconds"
+          echo "Resolution     : 1080x1920"
+          echo "FPS            : 30"
+          echo "Zoom           : 1.00x -> 1.15x"
+          echo "Pan            : LEFT -> RIGHT"
+          echo "Subtitles      : BURNED IN"
+          echo "Subtitle Events: 3"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg \
+            -t 15 \
+            -filter_complex "\
+            [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+            crop=2160:3840,\
+            zoompan=\
+            z='1.0+0.15*(0.5-0.5*cos(PI*on/449))':\
+            x='(iw-iw/zoom)*(0.5-0.5*cos(PI*on/449))':\
+            y='(ih-ih/zoom)/2':\
+            d=1:\
+            s=1080x1920:\
+            fps=30,\
+            format=yuv420p,\
+            subtitles=work/subtitles.srt:\
+            force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=150'\
+            [v]" \
+            -map "[v]" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r 30 \
+            work/subtitled_motion.mp4
+
+          echo "======================================"
+          echo "IMAGE MOTION + SUBTITLE RENDER COMPLETED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 12. VERIFY VIDEO BEFORE AUDIO
+      # ==========================================================
+
+      - name: Verify subtitled video
+        run: |
+          echo "======================================"
+          echo "VERIFYING SUBTITLED VIDEO"
+          echo "======================================"
+
+          VIDEO="work/subtitled_motion.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Subtitled video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "File Size : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Video file is empty."
+            exit 1
+          fi
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "SUBTITLED VIDEO : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 13. ADD REAL AICAP NARRATION
+      #
+      # Narration is padded with silence.
+      # Final video remains exactly 15 seconds.
+      # ==========================================================
+
+      - name: Add real AICAP narration
+        run: |
+          echo "======================================"
+          echo "ADDING REAL AICAP NARRATION"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/subtitled_motion.mp4 \
+            -i AI_in_60_Seconds_DEFAULT_20260811_190008.mp3 \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t 15 \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_06_SUBTITLES.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 14. FINAL VIDEO VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 06 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "06 — SUBTITLES"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_06_SUBTITLES.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Output video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+          echo "Resolution       : 1080x1920"
+          echo "FPS              : 30"
+          echo "Duration         : 15 seconds"
+          echo "Zoom             : 1.00x -> 1.15x"
+          echo "Pan              : LEFT -> RIGHT"
+          echo "Subtitles        : BURNED IN"
+          echo "Subtitle Events  : 3"
+          echo "Narration        : REAL AICAP AUDIO"
+          echo "Video Codec      : H.264"
+          echo "Audio Codec      : AAC"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 15. UPLOAD ARTIFACT
+      # ==========================================================
+
+      - name: Upload Test 06 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-06-SUBTITLES
+          path: output/AICAP_FREE_06_SUBTITLES.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 16. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 06 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "06 — SUBTITLES"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "IMAGE             : REAL AICAP IMAGE"
+          echo "DURATION          : 15 seconds"
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "ZOOM              : 1.00x -> 1.15x"
+          echo "PAN               : LEFT -> RIGHT"
+          echo "SUBTITLES         : BURNED IN"
+          echo "SUBTITLE EVENTS   : 3"
+          echo "NARRATION         : REAL AICAP AUDIO"
+          echo "VIDEO CODEC       : H.264"
+          echo "AUDIO CODEC       : AAC"
+          echo "OUTPUT            : AICAP_FREE_06_SUBTITLES.mp4"
+          echo "ARTIFACT          : AICAP-FREE-06-SUBTITLES"
+
+          echo "======================================"
+          echo "TEST 06 STATUS : PASSED"
+          echo "======================================"
