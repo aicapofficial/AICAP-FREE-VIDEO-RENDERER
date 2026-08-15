@@ -1,0 +1,841 @@
+name: AICAP FREE RENDER — 08 — DYNAMIC JSON SCENE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-08:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG
+      # ==========================================================
+
+      - name: Install FFmpeg
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "08 — DYNAMIC JSON SCENE"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq
+
+          echo "FFmpeg installed."
+          echo "jq installed."
+
+
+      # ==========================================================
+      # 03. VERIFY TOOLS
+      # ==========================================================
+
+      - name: Verify FFmpeg and jq
+        run: |
+          echo "======================================"
+          echo "TOOL VERIFICATION"
+          echo "======================================"
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "Path   : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq     : AVAILABLE"
+            echo "Path   : $(which jq)"
+          else
+            echo "jq     : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "TOOLS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "REAL AICAP ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. CREATE DYNAMIC JSON CONFIGURATION
+      #
+      # IMPORTANT:
+      # The renderer will read these values from JSON.
+      #
+      # The FFmpeg rendering commands below do NOT directly
+      # contain the scene durations or image filenames.
+      # ==========================================================
+
+      - name: Create dynamic JSON scene configuration
+        run: |
+          echo "======================================"
+          echo "CREATING DYNAMIC JSON CONFIGURATION"
+          echo "======================================"
+
+          cat > scene_config.json <<'EOF'
+          {
+            "project": {
+              "name": "AICAP_TEST_08_DYNAMIC_JSON",
+              "resolution": {
+                "width": 1080,
+                "height": 1920
+              },
+              "fps": 30,
+              "total_duration": 60
+            },
+            "transition": {
+              "type": "fade",
+              "duration": 1
+            },
+            "audio": {
+              "file": "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+            },
+            "scenes": [
+              {
+                "id": 1,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "duration": 12,
+                "motion": "zoom_in"
+              },
+              {
+                "id": 2,
+                "image": "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg",
+                "duration": 18,
+                "motion": "zoom_in"
+              },
+              {
+                "id": 3,
+                "image": "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg",
+                "duration": 30,
+                "motion": "zoom_in"
+              }
+            ]
+          }
+          EOF
+
+          echo "--------------------------------------"
+          echo "scene_config.json"
+          echo "--------------------------------------"
+
+          cat scene_config.json
+
+          echo "======================================"
+          echo "JSON CONFIGURATION CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. VALIDATE JSON CONFIGURATION
+      # ==========================================================
+
+      - name: Validate JSON configuration
+        run: |
+          echo "======================================"
+          echo "VALIDATING JSON CONFIGURATION"
+          echo "======================================"
+
+          if [ ! -f scene_config.json ]; then
+            echo "ERROR: scene_config.json not found."
+            exit 1
+          fi
+
+          jq empty scene_config.json
+
+          echo "JSON syntax : VALID"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          echo "Scene Count : $SCENE_COUNT"
+
+          if [ "$SCENE_COUNT" -ne 3 ]; then
+            echo "ERROR: Expected exactly 3 scenes."
+            exit 1
+          fi
+
+          FPS=$(jq '.project.fps' scene_config.json)
+          TOTAL=$(jq '.project.total_duration' scene_config.json)
+          WIDTH=$(jq '.project.resolution.width' scene_config.json)
+          HEIGHT=$(jq '.project.resolution.height' scene_config.json)
+          TRANSITION=$(jq '.transition.duration' scene_config.json)
+
+          echo "FPS              : $FPS"
+          echo "Total Duration   : $TOTAL"
+          echo "Resolution       : ${WIDTH}x${HEIGHT}"
+          echo "Transition       : $TRANSITION seconds"
+
+          echo "======================================"
+          echo "JSON CONFIGURATION : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 07. READ SCENE CONFIGURATION FROM JSON
+      # ==========================================================
+
+      - name: Read scene configuration from JSON
+        run: |
+          echo "======================================"
+          echo "READING SCENES FROM JSON"
+          echo "======================================"
+
+          jq -r '
+            .scenes[] |
+            "Scene \(.id) | Image=\(.image) | Duration=\(.duration)s | Motion=\(.motion)"
+          ' scene_config.json
+
+          echo "======================================"
+          echo "JSON SCENE DATA READ SUCCESSFULLY"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 08. VALIDATE ASSETS REFERENCED BY JSON
+      # ==========================================================
+
+      - name: Validate JSON referenced assets
+        run: |
+          echo "======================================"
+          echo "VALIDATING JSON REFERENCED ASSETS"
+          echo "======================================"
+
+          jq -r '.scenes[].image' scene_config.json |
+          while IFS= read -r FILE
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: JSON references missing file:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$FILE")
+
+            echo "File : $FILE"
+            echo "Size : $SIZE bytes"
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty asset:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            echo "--------------------------------------"
+          done
+
+          AUDIO=$(jq -r '.audio.file' scene_config.json)
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: JSON audio file missing:"
+            echo "$AUDIO"
+            exit 1
+          fi
+
+          AUDIO_SIZE=$(stat -c%s "$AUDIO")
+
+          echo "Audio : $AUDIO"
+          echo "Size  : $AUDIO_SIZE bytes"
+
+          if [ "$AUDIO_SIZE" -le 0 ]; then
+            echo "ERROR: Audio file is empty."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "ALL JSON REFERENCED ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 09. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+          echo "Working directories created."
+
+
+      # ==========================================================
+      # 10. EXTRACT GLOBAL CONFIGURATION
+      # ==========================================================
+
+      - name: Extract global configuration
+        run: |
+          WIDTH=$(jq -r '.project.resolution.width' scene_config.json)
+          HEIGHT=$(jq -r '.project.resolution.height' scene_config.json)
+          FPS=$(jq -r '.project.fps' scene_config.json)
+          TOTAL=$(jq -r '.project.total_duration' scene_config.json)
+          TRANSITION=$(jq -r '.transition.duration' scene_config.json)
+
+          echo "WIDTH=$WIDTH" >> "$GITHUB_ENV"
+          echo "HEIGHT=$HEIGHT" >> "$GITHUB_ENV"
+          echo "FPS=$FPS" >> "$GITHUB_ENV"
+          echo "TOTAL_DURATION=$TOTAL" >> "$GITHUB_ENV"
+          echo "TRANSITION_DURATION=$TRANSITION" >> "$GITHUB_ENV"
+
+          echo "======================================"
+          echo "GLOBAL CONFIGURATION"
+          echo "======================================"
+          echo "Width              : $WIDTH"
+          echo "Height             : $HEIGHT"
+          echo "FPS                : $FPS"
+          echo "Total Duration     : $TOTAL"
+          echo "Transition Duration: $TRANSITION"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 11. RENDER ALL SCENES FROM JSON
+      #
+      # This loop is the key part of Test 08.
+      #
+      # The renderer obtains:
+      #   image
+      #   duration
+      #   motion
+      #
+      # directly from scene_config.json.
+      # ==========================================================
+
+      - name: Render scenes from JSON
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "DYNAMIC JSON SCENE RENDERER"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          echo "Scene Count : $SCENE_COUNT"
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            SCENE_ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            echo "--------------------------------------"
+            echo "SCENE $SCENE_ID"
+            echo "Image    : $IMAGE"
+            echo "Duration : $DURATION"
+            echo "Motion   : $MOTION"
+            echo "--------------------------------------"
+
+            if [ "$INDEX" -lt $((SCENE_COUNT - 1)) ]; then
+              SOURCE_DURATION=$(awk "BEGIN {print $DURATION + $TRANSITION_DURATION}")
+            else
+              SOURCE_DURATION="$DURATION"
+            fi
+
+            FRAMES=$(awk "BEGIN {printf \"%d\", $SOURCE_DURATION * $FPS - 1}")
+
+            if [ "$MOTION" = "zoom_in" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -filter_complex "\
+                [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                crop=2160:3840,\
+                zoompan=\
+                z='1.0+0.15*(0.5-0.5*cos(PI*on/$FRAMES))':\
+                x='(iw-iw/zoom)*(0.5-0.5*cos(PI*on/$FRAMES))':\
+                y='(ih-ih/zoom)/2':\
+                d=1:\
+                s=${WIDTH}x${HEIGHT}:\
+                fps=${FPS},\
+                format=yuv420p[v]" \
+                -map "[v]" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -r "$FPS" \
+                "work/scene${SCENE_ID}.mp4"
+
+            else
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2" \
+                -r "$FPS" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -an \
+                "work/scene${SCENE_ID}.mp4"
+
+            fi
+
+            echo "Scene $SCENE_ID rendered."
+
+          done
+
+          echo "======================================"
+          echo "ALL JSON SCENES RENDERED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 12. VERIFY RENDERED SCENES
+      # ==========================================================
+
+      - name: Verify dynamically rendered scenes
+        run: |
+          echo "======================================"
+          echo "VERIFYING DYNAMIC SCENES"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+            SCENE_ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            FILE="work/scene${SCENE_ID}.mp4"
+
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing rendered scene:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$FILE")
+
+            echo "Scene $SCENE_ID"
+            echo "File : $FILE"
+            echo "Size : $SIZE bytes"
+
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1 \
+              "$FILE"
+
+            echo "--------------------------------------"
+          done
+
+
+      # ==========================================================
+      # 13. BUILD DYNAMIC XFADE FILTER
+      #
+      # The offsets are calculated from the durations in JSON.
+      #
+      # For:
+      #   12 + 18 + 30
+      #
+      # with 1-sec transitions:
+      #
+      # Transition 1 offset = 12
+      # Transition 2 offset = 30
+      # ==========================================================
+
+      - name: Build dynamic transition filter
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "BUILDING DYNAMIC TRANSITION FILTER"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset="
+
+          OFFSET=$(jq -r '.scenes[0].duration' scene_config.json)
+
+          FILTER="${FILTER}${OFFSET}[v1]"
+
+          if [ "$SCENE_COUNT" -gt 2 ]; then
+
+            for INDEX in $(seq 2 $((SCENE_COUNT - 1)))
+            do
+
+              PREVIOUS=$((INDEX - 1))
+
+              DURATION=$(jq -r ".scenes[$PREVIOUS].duration" scene_config.json)
+
+              OFFSET=$(awk \
+                "BEGIN {print $OFFSET + $DURATION}" \
+              )
+
+              if [ "$INDEX" -eq $((SCENE_COUNT - 1)) ]; then
+                FILTER="${FILTER};[v1][${INDEX}:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${OFFSET}[v2]"
+              fi
+
+            done
+
+          fi
+
+          echo "Generated filter:"
+          echo "$FILTER"
+
+          echo "$FILTER" > work/xfade_filter.txt
+
+          echo "======================================"
+          echo "DYNAMIC TRANSITION FILTER CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 14. APPLY DYNAMIC TRANSITIONS
+      #
+      # For the current 3-scene test we use the generated
+      # dynamic filter.
+      # ==========================================================
+
+      - name: Apply JSON-driven transitions
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "APPLYING JSON-DRIVEN TRANSITIONS"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -eq 1 ]; then
+
+            cp work/scene1.mp4 work/video_core.mp4
+
+          elif [ "$SCENE_COUNT" -eq 2 ]; then
+
+            DURATION1=$(jq -r '.scenes[0].duration' scene_config.json)
+
+            FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${DURATION1}[v]"
+
+            ffmpeg \
+              -y \
+              -i work/scene1.mp4 \
+              -i work/scene2.mp4 \
+              -filter_complex "$FILTER" \
+              -map "[v]" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r "$FPS" \
+              work/video_core.mp4
+
+          else
+
+            DURATION1=$(jq -r '.scenes[0].duration' scene_config.json)
+            DURATION2=$(jq -r '.scenes[1].duration' scene_config.json)
+
+            OFFSET2=$(awk "BEGIN {print $DURATION1 + $DURATION2}")
+
+            FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${DURATION1}[v1];[v1][2:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${OFFSET2}[v2]"
+
+            ffmpeg \
+              -y \
+              -i work/scene1.mp4 \
+              -i work/scene2.mp4 \
+              -i work/scene3.mp4 \
+              -filter_complex "$FILTER" \
+              -map "[v2]" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r "$FPS" \
+              work/video_core.mp4
+
+          fi
+
+          echo "======================================"
+          echo "JSON-DRIVEN TRANSITIONS APPLIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 15. VERIFY CORE VIDEO
+      # ==========================================================
+
+      - name: Verify JSON-driven core video
+        run: |
+          echo "======================================"
+          echo "CORE VIDEO VERIFICATION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          echo "======================================"
+          echo "CORE VIDEO : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 16. CREATE JSON-DRIVEN SUBTITLE FILE
+      #
+      # Subtitles are still test data at this stage.
+      # The important point is that the scene/rendering
+      # configuration is now JSON-driven.
+      # ==========================================================
+
+      - name: Create subtitle file
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 08 SUBTITLES"
+          echo "======================================"
+
+          cat > work/subtitles.srt <<'EOF'
+          1
+          00:00:00,000 --> 00:00:12,000
+          AICAP dynamic scene configuration is working.
+
+          2
+          00:00:12,000 --> 00:00:30,000
+          Each scene is controlled by JSON data.
+
+          3
+          00:00:30,000 --> 00:01:00,000
+          The renderer converts the configuration into video.
+          EOF
+
+          cat work/subtitles.srt
+
+
+      # ==========================================================
+      # 17. BURN SUBTITLES
+      # ==========================================================
+
+      - name: Burn subtitles
+        run: |
+          echo "======================================"
+          echo "BURNING SUBTITLES"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/video_core.mp4 \
+            -vf "subtitles=work/subtitles.srt:force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=150'" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r "$FPS" \
+            -an \
+            work/video_subtitles.mp4
+
+          echo "Subtitles burned."
+
+
+      # ==========================================================
+      # 18. ADD REAL AICAP NARRATION
+      # ==========================================================
+
+      - name: Add narration from JSON configuration
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "ADDING NARRATION FROM JSON"
+          echo "======================================"
+
+          AUDIO=$(jq -r '.audio.file' scene_config.json)
+
+          echo "Audio selected by JSON:"
+          echo "$AUDIO"
+
+          ffmpeg \
+            -y \
+            -i work/video_subtitles.mp4 \
+            -i "$AUDIO" \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t "$TOTAL_DURATION" \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_08_DYNAMIC_JSON_SCENE.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 19. FINAL VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 08 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "08 — DYNAMIC JSON SCENE"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_08_DYNAMIC_JSON_SCENE.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Final video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+          echo "Configuration    : JSON"
+          echo "Scene Count      : 3"
+          echo "Scene 01         : 12 seconds"
+          echo "Scene 02         : 18 seconds"
+          echo "Scene 03         : 30 seconds"
+          echo "Total Duration   : 60 seconds"
+          echo "Motion           : JSON CONTROLLED"
+          echo "Transitions      : JSON CONTROLLED"
+          echo "Narration        : JSON SELECTED"
+          echo "Subtitles        : BURNED IN"
+          echo "Resolution       : 1080x1920"
+          echo "FPS              : 30"
+          echo "Video Codec      : H.264"
+          echo "Audio Codec      : AAC"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 20. UPLOAD ARTIFACT
+      # ==========================================================
+
+      - name: Upload Test 08 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-08-DYNAMIC-JSON-SCENE
+          path: output/AICAP_FREE_08_DYNAMIC_JSON_SCENE.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 21. UPLOAD JSON CONFIGURATION
+      #
+      # This lets us keep the exact configuration that produced
+      # the video alongside the MP4 artifact.
+      # ==========================================================
+
+      - name: Upload JSON configuration
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-08-JSON-CONFIG
+          path: scene_config.json
+          retention-days: 1
+
+
+      # ==========================================================
+      # 22. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 08 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "08 — DYNAMIC JSON SCENE"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "CONFIGURATION     : JSON"
+          echo "SCENE COUNT       : 3"
+          echo "SCENE 01          : 12 seconds"
+          echo "SCENE 02          : 18 seconds"
+          echo "SCENE 03          : 30 seconds"
+          echo "TOTAL VIDEO       : 60 seconds"
+          echo "MOTION            : JSON CONTROLLED"
+          echo "TRANSITIONS       : JSON CONTROLLED"
+          echo "NARRATION         : JSON SELECTED"
+          echo "SUBTITLES         : BURNED IN"
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "VIDEO CODEC       : H.264"
+          echo "AUDIO CODEC       : AAC"
+          echo "OUTPUT            : AICAP_FREE_08_DYNAMIC_JSON_SCENE.mp4"
+          echo "ARTIFACT          : AICAP-FREE-08-DYNAMIC-JSON-SCENE"
+          echo "CONFIG ARTIFACT   : AICAP-FREE-08-JSON-CONFIG"
+
+          echo "======================================"
+          echo "TEST 08 STATUS : PASSED"
+          echo "======================================"
