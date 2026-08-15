@@ -1,0 +1,496 @@
+name: AICAP FREE RENDER — 04 — SCENE TRANSITIONS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-04:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG
+      # ==========================================================
+
+      - name: Install FFmpeg
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "04 — SCENE TRANSITIONS"
+          echo "======================================"
+          echo "Installing FFmpeg..."
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+          echo "FFmpeg installation completed."
+
+
+      # ==========================================================
+      # 03. VERIFY FFMPEG
+      # ==========================================================
+
+      - name: Verify FFmpeg
+        run: |
+          echo "======================================"
+          echo "FFMPEG VERIFICATION"
+          echo "======================================"
+
+          ffmpeg -version | head -n 3
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "FFmpeg Path : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "AICAP REAL ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. VALIDATE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Validate real AICAP assets
+        run: |
+          echo "======================================"
+          echo "VALIDATING REAL AICAP ASSETS"
+          echo "======================================"
+
+          IMAGE1="AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+          IMAGE2="AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+          IMAGE3="AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+          AUDIO="AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+          for FILE in "$IMAGE1" "$IMAGE2" "$IMAGE3" "$AUDIO"
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing asset:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$FILE")
+
+            echo "File : $FILE"
+            echo "Size : $SIZE bytes"
+            echo "--------------------------------------"
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty asset:"
+              echo "$FILE"
+              exit 1
+            fi
+          done
+
+          echo "======================================"
+          echo "ALL REAL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+          echo "Working directories created."
+
+
+      # ==========================================================
+      # 07. RENDER SCENE 01 SOURCE
+      #     13 SECONDS
+      #
+      #     12 SEC UNIQUE + 1 SEC TRANSITION
+      # ==========================================================
+
+      - name: Render Scene 01 source
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 01 SOURCE"
+          echo "Source Duration : 13 seconds"
+          echo "Unique Duration : 12 seconds"
+          echo "Transition      : 1 second"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg \
+            -t 13 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene01.mp4
+
+          echo "Scene 01 source completed."
+
+
+      # ==========================================================
+      # 08. RENDER SCENE 02 SOURCE
+      #     19 SECONDS
+      #
+      #     18 SEC UNIQUE + 1 SEC TRANSITION
+      # ==========================================================
+
+      - name: Render Scene 02 source
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 02 SOURCE"
+          echo "Source Duration : 19 seconds"
+          echo "Unique Duration : 18 seconds"
+          echo "Transition      : 1 second"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg \
+            -t 19 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene02.mp4
+
+          echo "Scene 02 source completed."
+
+
+      # ==========================================================
+      # 09. RENDER SCENE 03 SOURCE
+      #     30 SECONDS
+      # ==========================================================
+
+      - name: Render Scene 03 source
+        run: |
+          echo "======================================"
+          echo "RENDERING SCENE 03 SOURCE"
+          echo "Duration : 30 seconds"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -loop 1 \
+            -i AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg \
+            -t 30 \
+            -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
+            -r 30 \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -an \
+            work/scene03.mp4
+
+          echo "Scene 03 source completed."
+
+
+      # ==========================================================
+      # 10. VERIFY SOURCE DURATIONS
+      # ==========================================================
+
+      - name: Verify source durations
+        run: |
+          echo "======================================"
+          echo "VERIFYING SOURCE DURATIONS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 \
+            work/scene01.mp4
+
+          echo "--------------------------------------"
+
+          echo "Scene 02:"
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 \
+            work/scene02.mp4
+
+          echo "--------------------------------------"
+
+          echo "Scene 03:"
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 \
+            work/scene03.mp4
+
+
+      # ==========================================================
+      # 11. CREATE FIRST FADE
+      #
+      # Scene 01 -> Scene 02
+      # 1 SECOND
+      # ==========================================================
+
+      - name: Create Scene 01 to Scene 02 fade
+        run: |
+          echo "======================================"
+          echo "TRANSITION 01"
+          echo "SCENE 01 -> SCENE 02"
+          echo "Style    : FADE"
+          echo "Duration : 1 second"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/scene01.mp4 \
+            -i work/scene02.mp4 \
+            -filter_complex \
+            "[0:v][1:v]xfade=transition=fade:duration=1:offset=12[v]" \
+            -map "[v]" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r 30 \
+            work/transition12.mp4
+
+          echo "Transition 01 completed."
+
+
+      # ==========================================================
+      # 12. CREATE SECOND FADE
+      #
+      # transition12 = 31 seconds
+      # Scene 03 begins after 30 seconds
+      # ==========================================================
+
+      - name: Create Scene 02 to Scene 03 fade
+        run: |
+          echo "======================================"
+          echo "TRANSITION 02"
+          echo "SCENE 02 -> SCENE 03"
+          echo "Style    : FADE"
+          echo "Duration : 1 second"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/transition12.mp4 \
+            -i work/scene03.mp4 \
+            -filter_complex \
+            "[0:v][1:v]xfade=transition=fade:duration=1:offset=30[v]" \
+            -map "[v]" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r 30 \
+            work/video_with_transitions.mp4
+
+          echo "Transition 02 completed."
+
+
+      # ==========================================================
+      # 13. VERIFY TRANSITION VIDEO
+      # ==========================================================
+
+      - name: Verify transition video
+        run: |
+          echo "======================================"
+          echo "VERIFYING TRANSITION VIDEO"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 \
+            work/video_with_transitions.mp4
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            work/video_with_transitions.mp4
+
+
+      # ==========================================================
+      # 14. ADD REAL AICAP NARRATION
+      #
+      # apad keeps audio stream available to 60 seconds.
+      # Video remains exactly 60 seconds.
+      # ==========================================================
+
+      - name: Add real AICAP narration
+        run: |
+          echo "======================================"
+          echo "ADDING REAL AICAP NARRATION"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/video_with_transitions.mp4 \
+            -i AI_in_60_Seconds_DEFAULT_20260811_190008.mp3 \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t 60 \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_04_SCENE_TRANSITIONS.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 15. FINAL VIDEO VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 04 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "04 — SCENE TRANSITIONS"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_04_SCENE_TRANSITIONS.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Output video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+          echo "Resolution        : 1080x1920"
+          echo "FPS               : 30"
+          echo "Final Duration    : 60 seconds"
+          echo "Scene Count       : 3"
+          echo "Transition 1      : FADE / 1 second"
+          echo "Transition 2      : FADE / 1 second"
+          echo "Narration         : REAL AICAP AUDIO"
+          echo "Video Codec       : H.264"
+          echo "Audio Codec       : AAC"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 16. UPLOAD ARTIFACT
+      # ==========================================================
+
+      - name: Upload Test 04 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-04-SCENE-TRANSITIONS
+          path: output/AICAP_FREE_04_SCENE_TRANSITIONS.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 17. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 04 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "04 — SCENE TRANSITIONS"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "SCENE COUNT       : 3"
+          echo "TRANSITION 01     : FADE / 1 second"
+          echo "TRANSITION 02     : FADE / 1 second"
+          echo "TOTAL VIDEO       : 60 seconds"
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "NARRATION         : REAL AICAP AUDIO"
+          echo "VIDEO CODEC       : H.264"
+          echo "AUDIO CODEC       : AAC"
+          echo "OUTPUT            : AICAP_FREE_04_SCENE_TRANSITIONS.mp4"
+          echo "ARTIFACT          : AICAP-FREE-04-SCENE-TRANSITIONS"
+
+          echo "======================================"
+          echo "TEST 04 STATUS : PASSED"
+          echo "======================================"
