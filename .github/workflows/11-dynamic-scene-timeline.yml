@@ -1,0 +1,1204 @@
+name: AICAP FREE RENDER — 11 — DYNAMIC SCENE TIMELINE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-11:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG + JQ
+      # ==========================================================
+
+      - name: Install FFmpeg and jq
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "11 — DYNAMIC SCENE TIMELINE"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq
+
+          echo "FFmpeg installed."
+          echo "jq installed."
+
+
+      # ==========================================================
+      # 03. VERIFY TOOLS
+      # ==========================================================
+
+      - name: Verify rendering tools
+        run: |
+          echo "======================================"
+          echo "TOOL VERIFICATION"
+          echo "======================================"
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "Path   : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq     : AVAILABLE"
+            echo "Path   : $(which jq)"
+          else
+            echo "jq     : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "TOOLS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "REAL AICAP ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Scene 04:"
+          echo "Scene 01 image reused for renderer testing"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. CREATE TEST 11 TIMELINE JSON
+      #
+      # IMPORTANT:
+      #
+      # The scene START time is now explicitly stored in JSON.
+      #
+      # Scene 01:
+      #   start    = 0
+      #   duration = 10
+      #   end      = 10
+      #
+      # Scene 02:
+      #   start    = 10
+      #   duration = 15
+      #   end      = 25
+      #
+      # Scene 03:
+      #   start    = 25
+      #   duration = 15
+      #   end      = 40
+      #
+      # Scene 04:
+      #   start    = 40
+      #   duration = 20
+      #   end      = 60
+      # ==========================================================
+
+      - name: Create dynamic timeline JSON
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 11 TIMELINE JSON"
+          echo "======================================"
+
+          cat > scene_config.json <<'EOF'
+          {
+            "project": {
+              "name": "AICAP_TEST_11_DYNAMIC_SCENE_TIMELINE",
+              "resolution": {
+                "width": 1080,
+                "height": 1920
+              },
+              "fps": 30,
+              "total_duration": 60
+            },
+
+            "transition": {
+              "type": "fade",
+              "duration": 1
+            },
+
+            "audio": {
+              "file": "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+            },
+
+            "scenes": [
+              {
+                "id": 1,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 0,
+                "duration": 10,
+                "end": 10,
+                "motion": "zoom_in"
+              },
+
+              {
+                "id": 2,
+                "image": "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg",
+                "start": 10,
+                "duration": 15,
+                "end": 25,
+                "motion": "zoom_out"
+              },
+
+              {
+                "id": 3,
+                "image": "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg",
+                "start": 25,
+                "duration": 15,
+                "end": 40,
+                "motion": "pan_left"
+              },
+
+              {
+                "id": 4,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 40,
+                "duration": 20,
+                "end": 60,
+                "motion": "pan_right"
+              }
+            ]
+          }
+          EOF
+
+          echo "--------------------------------------"
+          echo "TEST 11 TIMELINE JSON"
+          echo "--------------------------------------"
+
+          cat scene_config.json
+
+          echo "======================================"
+          echo "TIMELINE JSON CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. VALIDATE JSON SYNTAX
+      # ==========================================================
+
+      - name: Validate JSON syntax
+        run: |
+          echo "======================================"
+          echo "JSON SYNTAX VALIDATION"
+          echo "======================================"
+
+          jq empty scene_config.json
+
+          echo "JSON syntax : VALID"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 07. READ GLOBAL CONFIGURATION
+      # ==========================================================
+
+      - name: Read global configuration
+        run: |
+          WIDTH=$(jq -r '.project.resolution.width' scene_config.json)
+          HEIGHT=$(jq -r '.project.resolution.height' scene_config.json)
+          FPS=$(jq -r '.project.fps' scene_config.json)
+          TARGET=$(jq -r '.project.total_duration' scene_config.json)
+          TRANSITION=$(jq -r '.transition.duration' scene_config.json)
+
+          echo "WIDTH=$WIDTH" >> "$GITHUB_ENV"
+          echo "HEIGHT=$HEIGHT" >> "$GITHUB_ENV"
+          echo "FPS=$FPS" >> "$GITHUB_ENV"
+          echo "TARGET_DURATION=$TARGET" >> "$GITHUB_ENV"
+          echo "TRANSITION_DURATION=$TRANSITION" >> "$GITHUB_ENV"
+
+          echo "======================================"
+          echo "GLOBAL CONFIGURATION"
+          echo "======================================"
+
+          echo "Resolution : ${WIDTH}x${HEIGHT}"
+          echo "FPS        : $FPS"
+          echo "Target     : $TARGET seconds"
+          echo "Transition : $TRANSITION seconds"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 08. VALIDATE SCENE TIMELINE
+      #
+      # THIS IS THE CORE OF TEST 11.
+      #
+      # The renderer checks:
+      #
+      # 1. start is correct
+      # 2. end = start + duration
+      # 3. next scene starts where previous scene ends
+      # 4. final scene ends at project total_duration
+      #
+      # This means the JSON itself becomes the source of truth
+      # for the timeline.
+      # ==========================================================
+
+      - name: Validate dynamic scene timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "DYNAMIC TIMELINE VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+          TARGET_DURATION=$(jq '.project.total_duration' scene_config.json)
+
+          echo "Scene Count    : $SCENE_COUNT"
+          echo "Target Duration: $TARGET_DURATION seconds"
+          echo "======================================"
+
+          EXPECTED_START=0
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+
+            # ------------------------------------------------------
+            # Validate start position
+            # ------------------------------------------------------
+
+            if [ "$START" -ne "$EXPECTED_START" ]; then
+              echo "ERROR:"
+              echo "Scene $ID starts at $START."
+              echo "Expected start: $EXPECTED_START."
+              exit 1
+            fi
+
+            # ------------------------------------------------------
+            # Validate end = start + duration
+            # ------------------------------------------------------
+
+            CALCULATED_END=$((START + DURATION))
+
+            if [ "$END" -ne "$CALCULATED_END" ]; then
+              echo "ERROR:"
+              echo "Scene $ID end value is incorrect."
+              echo "Expected: $CALCULATED_END"
+              echo "JSON:      $END"
+              exit 1
+            fi
+
+            echo "Start validation    : PASS"
+            echo "Duration validation : PASS"
+            echo "End validation      : PASS"
+
+            EXPECTED_START="$END"
+
+          done
+
+          # --------------------------------------------------------
+          # Validate final timeline endpoint
+          # --------------------------------------------------------
+
+          if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
+            echo "ERROR:"
+            echo "Timeline ends at $EXPECTED_START seconds."
+            echo "Expected: $TARGET_DURATION seconds."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "Timeline endpoint : $EXPECTED_START seconds"
+          echo "Target endpoint   : $TARGET_DURATION seconds"
+          echo "======================================"
+          echo "TIMELINE VALIDATION : PASSED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 09. PRINT FINAL TIMELINE
+      # ==========================================================
+
+      - name: Display scene timeline
+        run: |
+          echo "======================================"
+          echo "AICAP SCENE TIMELINE"
+          echo "======================================"
+
+          jq -r '
+            .scenes[] |
+            "Scene \(.id) | Start=\(.start)s | Duration=\(.duration)s | End=\(.end)s | Motion=\(.motion)"
+          ' scene_config.json
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 10. VALIDATE MOTION TYPES
+      # ==========================================================
+
+      - name: Validate scene motion types
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "MOTION VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            echo "Scene $ID → $MOTION"
+
+            case "$MOTION" in
+
+              zoom_in)
+                ;;
+
+              zoom_out)
+                ;;
+
+              pan_left)
+                ;;
+
+              pan_right)
+                ;;
+
+              static)
+                ;;
+
+              *)
+                echo "ERROR: Unsupported motion type:"
+                echo "$MOTION"
+                exit 1
+                ;;
+
+            esac
+
+          done
+
+          echo "======================================"
+          echo "ALL MOTION TYPES : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 11. VALIDATE ALL ASSETS
+      # ==========================================================
+
+      - name: Validate timeline assets
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "ASSET VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+
+            echo "Checking:"
+            echo "$IMAGE"
+
+            if [ ! -f "$IMAGE" ]; then
+              echo "ERROR: Missing image:"
+              echo "$IMAGE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$IMAGE")
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty image:"
+              echo "$IMAGE"
+              exit 1
+            fi
+
+            echo "Size: $SIZE bytes"
+            echo "--------------------------------------"
+
+          done
+
+          AUDIO=$(jq -r '.audio.file' scene_config.json)
+
+          echo "Checking narration:"
+          echo "$AUDIO"
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: Narration file missing."
+            exit 1
+          fi
+
+          AUDIO_SIZE=$(stat -c%s "$AUDIO")
+
+          if [ "$AUDIO_SIZE" -le 0 ]; then
+            echo "ERROR: Narration is empty."
+            exit 1
+          fi
+
+          echo "Narration Size: $AUDIO_SIZE bytes"
+
+          echo "======================================"
+          echo "ALL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 12. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+          echo "Working directories created."
+
+
+      # ==========================================================
+      # 13. RENDER SCENES FROM TIMELINE JSON
+      #
+      # Each scene uses:
+      #
+      # start
+      # duration
+      # end
+      # motion
+      # image
+      #
+      # from the JSON.
+      # ==========================================================
+
+      - name: Render scenes from timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "TIMELINE-DRIVEN SCENE RENDERER"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            echo "--------------------------------------"
+            echo "RENDERING SCENE $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+            echo "Motion   : $MOTION"
+            echo "Image    : $IMAGE"
+            echo "--------------------------------------"
+
+            # Add transition tail to every scene except final scene.
+            if [ "$INDEX" -lt $((SCENE_COUNT - 1)) ]; then
+
+              SOURCE_DURATION=$(awk \
+                "BEGIN {print $DURATION + $TRANSITION_DURATION}"
+              )
+
+            else
+
+              SOURCE_DURATION="$DURATION"
+
+            fi
+
+            FRAME_COUNT=$(awk \
+              "BEGIN {printf \"%d\", $SOURCE_DURATION * $FPS - 1}"
+            )
+
+            OUTPUT="work/scene_${ID}.mp4"
+
+            # ------------------------------------------------------
+            # ZOOM IN
+            # ------------------------------------------------------
+
+            if [ "$MOTION" = "zoom_in" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -filter_complex "\
+                [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                crop=2160:3840,\
+                zoompan=\
+                z='1.0+0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                x='(iw-iw/zoom)*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                y='(ih-ih/zoom)/2':\
+                d=1:\
+                s=${WIDTH}x${HEIGHT}:\
+                fps=${FPS},\
+                format=yuv420p[v]" \
+                -map "[v]" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -r "$FPS" \
+                "$OUTPUT"
+
+
+            # ------------------------------------------------------
+            # ZOOM OUT
+            # ------------------------------------------------------
+
+            elif [ "$MOTION" = "zoom_out" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -filter_complex "\
+                [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                crop=2160:3840,\
+                zoompan=\
+                z='1.15-0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                x='(iw-iw/zoom)/2':\
+                y='(ih-ih/zoom)/2':\
+                d=1:\
+                s=${WIDTH}x${HEIGHT}:\
+                fps=${FPS},\
+                format=yuv420p[v]" \
+                -map "[v]" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -r "$FPS" \
+                "$OUTPUT"
+
+
+            # ------------------------------------------------------
+            # PAN LEFT
+            # ------------------------------------------------------
+
+            elif [ "$MOTION" = "pan_left" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -filter_complex "\
+                [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                crop=2160:3840,\
+                zoompan=\
+                z='1.12':\
+                x='(iw-iw/zoom)*(1-on/$FRAME_COUNT)':\
+                y='(ih-ih/zoom)/2':\
+                d=1:\
+                s=${WIDTH}x${HEIGHT}:\
+                fps=${FPS},\
+                format=yuv420p[v]" \
+                -map "[v]" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -r "$FPS" \
+                "$OUTPUT"
+
+
+            # ------------------------------------------------------
+            # PAN RIGHT
+            # ------------------------------------------------------
+
+            elif [ "$MOTION" = "pan_right" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -filter_complex "\
+                [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                crop=2160:3840,\
+                zoompan=\
+                z='1.12':\
+                x='(iw-iw/zoom)*(on/$FRAME_COUNT)':\
+                y='(ih-ih/zoom)/2':\
+                d=1:\
+                s=${WIDTH}x${HEIGHT}:\
+                fps=${FPS},\
+                format=yuv420p[v]" \
+                -map "[v]" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -r "$FPS" \
+                "$OUTPUT"
+
+
+            # ------------------------------------------------------
+            # STATIC
+            # ------------------------------------------------------
+
+            elif [ "$MOTION" = "static" ]; then
+
+              ffmpeg \
+                -y \
+                -loop 1 \
+                -i "$IMAGE" \
+                -t "$SOURCE_DURATION" \
+                -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2" \
+                -r "$FPS" \
+                -c:v libx264 \
+                -preset veryfast \
+                -pix_fmt yuv420p \
+                -an \
+                "$OUTPUT"
+
+            fi
+
+            if [ ! -f "$OUTPUT" ]; then
+              echo "ERROR: Scene $ID was not rendered."
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$OUTPUT")
+
+            echo "Scene $ID completed."
+            echo "Output : $OUTPUT"
+            echo "Size   : $SIZE bytes"
+
+          done
+
+          echo "======================================"
+          echo "ALL TIMELINE SCENES RENDERED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 14. VERIFY INDIVIDUAL SCENES
+      # ==========================================================
+
+      - name: Verify timeline scene outputs
+        run: |
+          echo "======================================"
+          echo "VERIFYING SCENE OUTPUTS"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            FILE="work/scene_${ID}.mp4"
+
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing:"
+              echo "$FILE"
+              exit 1
+            fi
+
+            echo "Scene $ID:"
+            echo "$FILE"
+
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1 \
+              "$FILE"
+
+            echo "--------------------------------------"
+
+          done
+
+          echo "ALL SCENE OUTPUTS : VERIFIED"
+
+
+      # ==========================================================
+      # 15. BUILD TIMELINE-BASED TRANSITION GRAPH
+      # ==========================================================
+
+      - name: Build timeline transition graph
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "BUILDING TIMELINE TRANSITION GRAPH"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -eq 1 ]; then
+
+            echo "SINGLE_SCENE" > work/filter_mode.txt
+
+          else
+
+            FIRST_START=$(jq -r '.scenes[0].start' scene_config.json)
+            FIRST_DURATION=$(jq -r '.scenes[0].duration' scene_config.json)
+
+            # The first transition occurs at the end of Scene 01.
+            OFFSET=$(awk \
+              "BEGIN {print $FIRST_START + $FIRST_DURATION}"
+            )
+
+            FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${OFFSET}[v1]"
+
+            if [ "$SCENE_COUNT" -gt 2 ]; then
+
+              for INDEX in $(seq 2 $((SCENE_COUNT - 1)))
+              do
+
+                CURRENT_START=$(jq \
+                  -r ".scenes[$INDEX].start" \
+                  scene_config.json
+                )
+
+                PREVIOUS_INDEX=$((INDEX - 1))
+
+                PREVIOUS_END=$(jq \
+                  -r ".scenes[$PREVIOUS_INDEX].end" \
+                  scene_config.json
+                )
+
+                echo "Transition before Scene $((INDEX + 1))"
+                echo "Previous end : $PREVIOUS_END"
+                echo "Current start: $CURRENT_START"
+
+                # Timeline source-of-truth:
+                # transition begins at the current scene's start.
+                OFFSET="$CURRENT_START"
+
+                PREVIOUS_LABEL="v$((INDEX - 1))"
+                CURRENT_LABEL="v$INDEX"
+
+                FILTER="${FILTER};[${PREVIOUS_LABEL}][${INDEX}:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${OFFSET}[${CURRENT_LABEL}]"
+
+              done
+
+            fi
+
+            echo "$FILTER" > work/dynamic_timeline_filter.txt
+
+            echo "--------------------------------------"
+            echo "TIMELINE FILTER GRAPH"
+            echo "--------------------------------------"
+
+            cat work/dynamic_timeline_filter.txt
+
+            echo "--------------------------------------"
+
+            echo "DYNAMIC_FILTER" > work/filter_mode.txt
+
+          fi
+
+          echo "======================================"
+          echo "TIMELINE TRANSITION GRAPH READY"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 16. APPLY TIMELINE TRANSITIONS
+      # ==========================================================
+
+      - name: Apply timeline transitions
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "APPLYING TIMELINE TRANSITIONS"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -eq 1 ]; then
+
+            cp work/scene_1.mp4 work/video_core.mp4
+
+          else
+
+            INPUT_ARGS=()
+
+            for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+            do
+
+              ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+              INPUT_ARGS+=(
+                -i
+                "work/scene_${ID}.mp4"
+              )
+
+            done
+
+            FILTER=$(cat work/dynamic_timeline_filter.txt)
+
+            FINAL_LABEL="v$((SCENE_COUNT - 1))"
+
+            ffmpeg \
+              -y \
+              "${INPUT_ARGS[@]}" \
+              -filter_complex "$FILTER" \
+              -map "[${FINAL_LABEL}]" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r "$FPS" \
+              work/video_core.mp4
+
+          fi
+
+          echo "======================================"
+          echo "TIMELINE TRANSITIONS COMPLETED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 17. VERIFY CORE VIDEO
+      # ==========================================================
+
+      - name: Verify timeline core video
+        run: |
+          echo "======================================"
+          echo "CORE VIDEO VERIFICATION"
+          echo "======================================"
+
+          if [ ! -f work/video_core.mp4 ]; then
+            echo "ERROR: Core video missing."
+            exit 1
+          fi
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          echo "======================================"
+          echo "CORE VIDEO : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 18. CREATE SUBTITLE TIMELINE FROM JSON
+      #
+      # IMPORTANT:
+      #
+      # The subtitle timestamps are generated from the JSON
+      # scene start/end values rather than being independently
+      # hard-coded.
+      # ==========================================================
+
+      - name: Create timeline-driven subtitles
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "CREATING TIMELINE-DRIVEN SUBTITLES"
+          echo "======================================"
+
+          : > work/subtitles.srt
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            NUMBER=$((INDEX + 1))
+
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            START_H=$((START / 3600))
+            START_M=$(((START % 3600) / 60))
+            START_S=$((START % 60))
+
+            END_H=$((END / 3600))
+            END_M=$(((END % 3600) / 60))
+            END_S=$((END % 60))
+
+            printf "%d\n" "$NUMBER" >> work/subtitles.srt
+
+            printf "%02d:%02d:%02d,000 --> %02d:%02d:%02d,000\n" \
+              "$START_H" \
+              "$START_M" \
+              "$START_S" \
+              "$END_H" \
+              "$END_M" \
+              "$END_S" \
+              >> work/subtitles.srt
+
+            echo "Scene $ID — ${START}s to ${END}s — motion: ${MOTION}" \
+              >> work/subtitles.srt
+
+            echo "" >> work/subtitles.srt
+
+          done
+
+          echo "--------------------------------------"
+          echo "GENERATED SUBTITLE TIMELINE"
+          echo "--------------------------------------"
+
+          cat work/subtitles.srt
+
+
+      # ==========================================================
+      # 19. BURN TIMELINE SUBTITLES
+      # ==========================================================
+
+      - name: Burn timeline subtitles
+        run: |
+          echo "======================================"
+          echo "BURNING TIMELINE SUBTITLES"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/video_core.mp4 \
+            -vf "subtitles=work/subtitles.srt:force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=150'" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r "$FPS" \
+            -an \
+            work/video_subtitles.mp4
+
+          echo "Timeline subtitles burned."
+
+
+      # ==========================================================
+      # 20. ADD NARRATION
+      # ==========================================================
+
+      - name: Add narration from timeline JSON
+        run: |
+          echo "======================================"
+          echo "ADDING NARRATION"
+          echo "======================================"
+
+          AUDIO=$(jq -r '.audio.file' scene_config.json)
+
+          echo "Narration selected from JSON:"
+          echo "$AUDIO"
+
+          ffmpeg \
+            -y \
+            -i work/video_subtitles.mp4 \
+            -i "$AUDIO" \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t "$TARGET_DURATION" \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_11_DYNAMIC_SCENE_TIMELINE.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 21. FINAL VIDEO VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 11 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "11 — DYNAMIC SCENE TIMELINE"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_11_DYNAMIC_SCENE_TIMELINE.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Final video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+          echo "Configuration     : JSON"
+          echo "Scene Count       : 4"
+          echo "Scene 01          : 0–10 sec"
+          echo "Scene 02          : 10–25 sec"
+          echo "Scene 03          : 25–40 sec"
+          echo "Scene 04          : 40–60 sec"
+          echo "Total Duration    : 60 sec"
+          echo "Motion            : Per Scene"
+          echo "Transitions       : Timeline Controlled"
+          echo "Subtitles         : Timeline Controlled"
+          echo "Narration         : JSON Selected"
+          echo "Resolution        : 1080x1920"
+          echo "FPS               : 30"
+          echo "Video Codec       : H.264"
+          echo "Audio Codec       : AAC"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 22. UPLOAD MP4
+      # ==========================================================
+
+      - name: Upload Test 11 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-11-DYNAMIC-SCENE-TIMELINE
+          path: output/AICAP_FREE_11_DYNAMIC_SCENE_TIMELINE.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 23. UPLOAD JSON
+      # ==========================================================
+
+      - name: Upload Test 11 JSON
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-11-JSON-TIMELINE
+          path: scene_config.json
+          retention-days: 1
+
+
+      # ==========================================================
+      # 24. UPLOAD GENERATED SUBTITLE TIMELINE
+      # ==========================================================
+
+      - name: Upload Test 11 subtitle timeline
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-11-SUBTITLE-TIMELINE
+          path: work/subtitles.srt
+          retention-days: 1
+
+
+      # ==========================================================
+      # 25. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 11 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "11 — DYNAMIC SCENE TIMELINE"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "CONFIGURATION     : JSON"
+          echo "SCENE COUNT       : 4"
+
+          echo "SCENE 01          : 0–10 sec"
+          echo "SCENE 02          : 10–25 sec"
+          echo "SCENE 03          : 25–40 sec"
+          echo "SCENE 04          : 40–60 sec"
+
+          echo "TOTAL VIDEO       : 60 sec"
+
+          echo "TIMELINE          : JSON CONTROLLED"
+          echo "MOTION            : JSON CONTROLLED"
+          echo "TRANSITIONS       : TIMELINE CONTROLLED"
+          echo "SUBTITLES         : TIMELINE CONTROLLED"
+          echo "NARRATION         : JSON SELECTED"
+
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "VIDEO CODEC       : H.264"
+          echo "AUDIO CODEC       : AAC"
+
+          echo "OUTPUT            : AICAP_FREE_11_DYNAMIC_SCENE_TIMELINE.mp4"
+
+          echo "VIDEO ARTIFACT    : AICAP-FREE-11-DYNAMIC-SCENE-TIMELINE"
+          echo "JSON ARTIFACT     : AICAP-FREE-11-JSON-TIMELINE"
+          echo "SUBTITLE ARTIFACT : AICAP-FREE-11-SUBTITLE-TIMELINE"
+
+          echo "======================================"
+          echo "TEST 11 STATUS : PASSED"
+          echo "======================================"
