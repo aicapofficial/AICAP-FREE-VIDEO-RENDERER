@@ -871,7 +871,7 @@ jobs:
 
               # Escape ASS special braces in user text.
               text = text.replace("{", r"\{").replace("}", r"\}")
-              text = text.replace("\\n", r"\N")
+              text = text.replace("\n", r"\N")
 
               inline = (
                   f"{{\\fs{size}"
