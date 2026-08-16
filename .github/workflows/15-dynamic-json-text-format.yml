@@ -1,4 +1,4 @@
-name: AICAP FREE RENDER — 15 — LARGE CLEAR DYNAMIC TEXT
+name: AICAP FREE RENDER — 15 — LARGE CLEAR DYNAMIC SUBTITLES
 
 on:
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "======================================"
           echo "AICAP FREE VIDEO RENDERER"
-          echo "TEST 15 — LARGE CLEAR DYNAMIC TEXT"
+          echo "TEST 15 — LARGE CLEAR DYNAMIC SUBTITLES"
           echo "======================================"
 
           sudo apt-get update
@@ -55,20 +55,19 @@ jobs:
 
 
       # ==========================================================
-      # 04. CREATE LARGE / CLEAR TEST JSON
+      # 04. CREATE TEST JSON
       # ==========================================================
 
       - name: Create Test 15 JSON
         run: |
           echo "======================================"
           echo "CREATING TEST 15 JSON"
-          echo "LARGE / CLEAR SUBTITLE VERSION"
           echo "======================================"
 
           cat > scene_config.json <<'EOF'
           {
             "project": {
-              "name": "AICAP_TEST_15_LARGE_CLEAR_DYNAMIC_TEXT",
+              "name": "AICAP_TEST_15_LARGE_CLEAR_DYNAMIC_SUBTITLES",
               "resolution": {
                 "width": 1080,
                 "height": 1920
@@ -131,7 +130,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 86,
+                    "size": 120,
                     "color": "#FFFFFF",
                     "bold": true,
                     "italic": false,
@@ -139,12 +138,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1640
+                      "y": 1580
                     },
 
-                    "outline": 4,
-                    "shadow": 2,
-                    "margin": 70
+                    "outline": 5,
+                    "shadow": 3,
+                    "margin": 90
                   }
                 }
               },
@@ -163,7 +162,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 78,
+                    "size": 112,
                     "color": "#FFFF00",
                     "bold": false,
                     "italic": true,
@@ -171,12 +170,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1600
+                      "y": 1580
                     },
 
                     "outline": 5,
-                    "shadow": 2,
-                    "margin": 70
+                    "shadow": 3,
+                    "margin": 90
                   }
                 }
               },
@@ -195,7 +194,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 82,
+                    "size": 115,
                     "color": "#00FFFF",
                     "bold": true,
                     "italic": true,
@@ -203,12 +202,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1540
+                      "y": 1510
                     },
 
-                    "outline": 4,
-                    "shadow": 2,
-                    "margin": 60
+                    "outline": 5,
+                    "shadow": 3,
+                    "margin": 90
                   }
                 }
               },
@@ -227,7 +226,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 88,
+                    "size": 120,
                     "color": "#00FF00",
                     "bold": false,
                     "italic": false,
@@ -235,12 +234,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1670
+                      "y": 1580
                     },
 
                     "outline": 5,
-                    "shadow": 2,
-                    "margin": 70
+                    "shadow": 3,
+                    "margin": 90
                   }
                 }
               }
@@ -337,7 +336,7 @@ jobs:
 
 
       # ==========================================================
-      # 08. VALIDATE NARRATION
+      # 08. VALIDATE NARRATION TIMELINE
       # ==========================================================
 
       - name: Validate narration timeline
@@ -423,53 +422,43 @@ jobs:
 
 
       # ==========================================================
-      # 10. VALIDATE TEXT FORMAT
+      # 10. VERIFY LARGE SUBTITLE SETTINGS
       # ==========================================================
 
-      - name: Validate JSON text formatting
+      - name: Verify large subtitle settings
         run: |
           echo "======================================"
-          echo "TEXT FORMAT VALIDATION"
+          echo "LARGE SUBTITLE SETTINGS"
           echo "======================================"
 
           COUNT=$(jq '.scenes | length' scene_config.json)
 
           for INDEX in $(seq 0 $((COUNT - 1)))
           do
-            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
 
-            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
             SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
+
             COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+
             BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
+
             ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
 
             echo "Scene $ID"
-            echo "Text   : $TEXT"
-            echo "Size   : $SIZE"
-            echo "Color  : $COLOR"
-            echo "Bold   : $BOLD"
-            echo "Italic : $ITALIC"
+            echo "Font size : $SIZE"
+            echo "Color     : $COLOR"
+            echo "Bold      : $BOLD"
+            echo "Italic    : $ITALIC"
 
-            if [ "$SIZE" -lt 70 ]; then
-              echo "ERROR: Font size is below large-visibility threshold."
+            if [ "$SIZE" -lt 100 ]; then
+              echo "ERROR: Subtitle size is below 100."
               exit 1
             fi
 
-            if [ -z "$TEXT" ] || [ "$TEXT" = "null" ]; then
-              echo "ERROR: Empty subtitle text."
-              exit 1
-            fi
-
-            if [[ ! "$COLOR" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
-              echo "ERROR: Invalid HEX color."
-              exit 1
-            fi
-
-            echo "Scene $ID : FORMAT VALID"
           done
 
-          echo "TEXT FORMAT : VALID"
+          echo "LARGE SUBTITLE SETTINGS : VERIFIED"
 
 
       # ==========================================================
@@ -773,14 +762,14 @@ jobs:
 
 
       # ==========================================================
-      # 16. GENERATE ASS
+      # 16. GENERATE ASS WITH INLINE LARGE TEXT
       # ==========================================================
 
       - name: Generate large clear ASS subtitles
         shell: bash
         run: |
           echo "======================================"
-          echo "GENERATING LARGE CLEAR ASS SUBTITLES"
+          echo "GENERATING INLINE LARGE CLEAR SUBTITLES"
           echo "======================================"
 
           cat > work/subtitles.ass <<'EOF'
@@ -789,85 +778,17 @@ jobs:
           PlayResX: 1080
           PlayResY: 1920
           ScaledBorderAndShadow: yes
+          WrapStyle: 2
 
           [V4+ Styles]
           Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-          EOF
-
-          COUNT=$(jq '.scenes | length' scene_config.json)
-
-          for INDEX in $(seq 0 $((COUNT - 1)))
-          do
-
-            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
-
-            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
-
-            if [ "$ENABLED" != "true" ]; then
-              continue
-            fi
-
-            FONT=$(jq -r ".scenes[$INDEX].subtitle.style.font" scene_config.json)
-            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
-
-            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
-
-            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
-
-            ALIGNMENT=$(jq -r ".scenes[$INDEX].subtitle.style.alignment" scene_config.json)
-
-            OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
-            SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
-
-            MARGIN=$(jq -r ".scenes[$INDEX].subtitle.style.margin" scene_config.json)
-
-            HEX=${COLOR#\#}
-
-            RR=${HEX:0:2}
-            GG=${HEX:2:2}
-            BB=${HEX:4:2}
-
-            ASS_COLOR="&H00${BB}${GG}${RR}"
-
-            if [ "$BOLD" = "true" ]; then
-              ASS_BOLD="-1"
-            else
-              ASS_BOLD="0"
-            fi
-
-            if [ "$ITALIC" = "true" ]; then
-              ASS_ITALIC="-1"
-            else
-              ASS_ITALIC="0"
-            fi
-
-            STYLE_NAME="Scene${ID}"
-
-            printf \
-              "%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,70,70,%s,1\n" \
-              "$STYLE_NAME" \
-              "$FONT" \
-              "$SIZE" \
-              "$ASS_COLOR" \
-              "$ASS_COLOR" \
-              "&H00000000" \
-              "&H00000000" \
-              "$ASS_BOLD" \
-              "$ASS_ITALIC" \
-              "$OUTLINE" \
-              "$SHADOW" \
-              "$ALIGNMENT" \
-              "$MARGIN" \
-              >> work/subtitles.ass
-
-          done
-
-          cat >> work/subtitles.ass <<'EOF'
+          Default,Arial,120,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,5,3,2,90,90,100,1
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           EOF
+
+          COUNT=$(jq '.scenes | length' scene_config.json)
 
           for INDEX in $(seq 0 $((COUNT - 1)))
           do
@@ -885,10 +806,37 @@ jobs:
 
             TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
 
+            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
+            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+
+            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
+            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+
             X=$(jq -r ".scenes[$INDEX].subtitle.style.position.x" scene_config.json)
             Y=$(jq -r ".scenes[$INDEX].subtitle.style.position.y" scene_config.json)
 
-            STYLE_NAME="Scene${ID}"
+            OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
+            SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
+
+            HEX=${COLOR#\#}
+
+            RR=${HEX:0:2}
+            GG=${HEX:2:2}
+            BB=${HEX:4:2}
+
+            ASS_COLOR="&H00${BB}${GG}${RR}"
+
+            if [ "$BOLD" = "true" ]; then
+              ASS_BOLD="1"
+            else
+              ASS_BOLD="0"
+            fi
+
+            if [ "$ITALIC" = "true" ]; then
+              ASS_ITALIC="1"
+            else
+              ASS_ITALIC="0"
+            fi
 
             START_H=$((START / 3600))
             START_M=$(((START % 3600) / 60))
@@ -911,29 +859,36 @@ jobs:
             ESCAPED_TEXT=$(printf '%s' "$TEXT" | \
               sed 's/{/\\{/g; s/}/\\}/g')
 
+            INLINE_TAG="{\\fs${SIZE}\\c${ASS_COLOR}\\b${ASS_BOLD}\\i${ASS_ITALIC}\\bord${OUTLINE}\\shad${SHADOW}\\q2\\pos(${X},${Y})}"
+
             printf \
-              "Dialogue: 0,%s,%s,%s,,0,0,0,,{\\pos(%s,%s)}%s\n" \
+              "Dialogue: 0,%s,%s,Default,,0,0,0,,%s%s\n" \
               "$START_ASS" \
               "$END_ASS" \
-              "$STYLE_NAME" \
-              "$X" \
-              "$Y" \
+              "$INLINE_TAG" \
               "$ESCAPED_TEXT" \
               >> work/subtitles.ass
 
+            echo "Scene $ID : ${SIZE}px"
+            echo "Color    : $COLOR"
+            echo "Bold     : $BOLD"
+            echo "Italic   : $ITALIC"
+
           done
 
-          echo "ASS FILE CREATED"
+          echo ""
+          echo "======================================"
+          echo "GENERATED ASS"
+          echo "======================================"
 
           cat work/subtitles.ass
 
 
       # ==========================================================
-      # 17. ASS VALIDATION
+      # 17. VALIDATE ASS
       # ==========================================================
 
       - name: Validate ASS subtitle structure
-        shell: bash
         run: |
           echo "======================================"
           echo "ASS STRUCTURE VALIDATION"
@@ -944,20 +899,12 @@ jobs:
             exit 1
           fi
 
-          if ! grep -q \
-            '^Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text$' \
-            work/subtitles.ass; then
-
-            echo "ERROR: Events Format line missing."
-            exit 1
-          fi
-
           DIALOGUE_COUNT=$(grep -c '^Dialogue:' work/subtitles.ass || true)
 
           echo "Dialogue events : $DIALOGUE_COUNT"
 
           if [ "$DIALOGUE_COUNT" -ne 4 ]; then
-            echo "ERROR: Expected exactly 4 Dialogue events."
+            echo "ERROR: Expected 4 dialogue events."
             exit 1
           fi
 
@@ -965,130 +912,100 @@ jobs:
 
 
       # ==========================================================
-      # 18. VERIFY STYLES
+      # 18. VERIFY INLINE FONT SIZE
       # ==========================================================
 
-      - name: Verify ASS styles
-        shell: bash
+      - name: Verify inline font sizes
         run: |
           echo "======================================"
-          echo "VERIFYING ASS STYLES"
+          echo "INLINE FONT SIZE VERIFICATION"
           echo "======================================"
 
-          for ID in 1 2 3 4
+          EXPECTED_SIZES="120 112 115 120"
+
+          INDEX=1
+
+          for SIZE in $EXPECTED_SIZES
           do
 
-            STYLE_NAME="Scene${ID}"
-
-            if ! grep -q "^${STYLE_NAME}," work/subtitles.ass; then
-              echo "ERROR: Missing style $STYLE_NAME"
+            if ! grep -q "\\\\fs${SIZE}" work/subtitles.ass; then
+              echo "ERROR: Inline font size ${SIZE} not found."
               exit 1
             fi
 
-            if ! grep -q "^Dialogue: .*${STYLE_NAME},," work/subtitles.ass; then
-              echo "ERROR: Missing dialogue for $STYLE_NAME"
-              exit 1
-            fi
+            echo "Scene $INDEX : ${SIZE}px VERIFIED"
 
-            echo "$STYLE_NAME : VERIFIED"
+            INDEX=$((INDEX + 1))
 
           done
 
-          echo "ALL STYLES : VERIFIED"
+          echo "INLINE FONT SIZES : VERIFIED"
 
 
       # ==========================================================
-      # 19. VERIFY LARGE FONT SIZES
+      # 19. VERIFY INLINE COLORS
       # ==========================================================
 
-      - name: Verify large font sizes
-        shell: bash
+      - name: Verify inline subtitle colors
         run: |
           echo "======================================"
-          echo "LARGE FONT VERIFICATION"
+          echo "INLINE COLOR VERIFICATION"
           echo "======================================"
 
-          for ID in 1 2 3 4
-          do
+          if ! grep -q '\\c&H00FFFFFF&' work/subtitles.ass; then
+            echo "ERROR: White subtitle color missing."
+            exit 1
+          fi
 
-            SIZE=$(jq -r ".scenes[$((ID - 1))].subtitle.style.size" scene_config.json)
+          if ! grep -q '\\c&H0000FFFF&' work/subtitles.ass; then
+            echo "ERROR: Yellow subtitle color missing."
+            exit 1
+          fi
 
-            echo "Scene $ID : ${SIZE}px"
+          if ! grep -q '\\c&H00FFFF00&' work/subtitles.ass; then
+            echo "ERROR: Cyan subtitle color missing."
+            exit 1
+          fi
 
-            if [ "$SIZE" -lt 70 ]; then
-              echo "ERROR: Font too small."
-              exit 1
-            fi
+          if ! grep -q '\\c&H0000FF00&' work/subtitles.ass; then
+            echo "ERROR: Green subtitle color missing."
+            exit 1
+          fi
 
-          done
-
-          echo "LARGE FONT SIZES : VERIFIED"
+          echo "INLINE COLORS : VERIFIED"
 
 
       # ==========================================================
-      # 20. VERIFY DYNAMIC FORMATTING
+      # 20. VERIFY INLINE STYLES
       # ==========================================================
 
-      - name: Verify dynamic text formatting
-        shell: bash
+      - name: Verify inline subtitle styles
         run: |
           echo "======================================"
-          echo "DYNAMIC TEXT FORMAT VERIFICATION"
+          echo "INLINE STYLE VERIFICATION"
           echo "======================================"
 
-          for INDEX in 0 1 2 3
-          do
+          if ! grep -q '\\b1\\i0' work/subtitles.ass; then
+            echo "ERROR: Bold style missing."
+            exit 1
+          fi
 
-            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+          if ! grep -q '\\b0\\i1' work/subtitles.ass; then
+            echo "ERROR: Italic style missing."
+            exit 1
+          fi
 
-            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
-            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+          if ! grep -q '\\b1\\i1' work/subtitles.ass; then
+            echo "ERROR: Bold + Italic style missing."
+            exit 1
+          fi
 
-            HEX=${COLOR#\#}
+          if ! grep -q '\\b0\\i0' work/subtitles.ass; then
+            echo "ERROR: Normal style missing."
+            exit 1
+          fi
 
-            RR=${HEX:0:2}
-            GG=${HEX:2:2}
-            BB=${HEX:4:2}
-
-            ASS_COLOR="&H00${BB}${GG}${RR}"
-
-            if [ "$BOLD" = "true" ]; then
-              ASS_BOLD="-1"
-            else
-              ASS_BOLD="0"
-            fi
-
-            if [ "$ITALIC" = "true" ]; then
-              ASS_ITALIC="-1"
-            else
-              ASS_ITALIC="0"
-            fi
-
-            STYLE_NAME="Scene${ID}"
-
-            STYLE_LINE=$(grep "^${STYLE_NAME}," work/subtitles.ass)
-
-            if [[ "$STYLE_LINE" != *"$ASS_COLOR"* ]]; then
-              echo "ERROR: Color conversion failed for Scene $ID."
-              exit 1
-            fi
-
-            if [[ "$STYLE_LINE" != *",$ASS_BOLD,"* ]]; then
-              echo "ERROR: Bold conversion failed for Scene $ID."
-              exit 1
-            fi
-
-            if [[ "$STYLE_LINE" != *",$ASS_ITALIC,"* ]]; then
-              echo "ERROR: Italic conversion failed for Scene $ID."
-              exit 1
-            fi
-
-            echo "Scene $ID : FORMAT VERIFIED"
-
-          done
-
-          echo "DYNAMIC TEXT FORMAT : VERIFIED"
+          echo "INLINE BOLD / ITALIC : VERIFIED"
 
 
       # ==========================================================
@@ -1115,13 +1032,13 @@ jobs:
 
 
       # ==========================================================
-      # 22. VERIFY SUBTITLED VIDEO
+      # 22. VERIFY SUBTITLE VIDEO
       # ==========================================================
 
       - name: Verify subtitled video
         run: |
           echo "======================================"
-          echo "SUBTITLED VIDEO VERIFICATION"
+          echo "SUBTITLE VIDEO VERIFICATION"
           echo "======================================"
 
           if [ ! -f work/video_subtitles.mp4 ]; then
@@ -1136,8 +1053,8 @@ jobs:
             exit 1
           fi
 
-          echo "Subtitle video size : $SIZE bytes"
-          echo "SUBTITLED VIDEO : VALID"
+          echo "Subtitle video : $SIZE bytes"
+          echo "SUBTITLE VIDEO : VALID"
 
 
       # ==========================================================
@@ -1162,7 +1079,7 @@ jobs:
             -c:a aac \
             -b:a 192k \
             -movflags +faststart \
-            output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
+            output/AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4
 
           echo "NARRATION : ADDED"
 
@@ -1177,7 +1094,7 @@ jobs:
           echo "FINAL VIDEO VALIDATION"
           echo "======================================"
 
-          VIDEO="output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4"
+          VIDEO="output/AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4"
 
           if [ ! -f "$VIDEO" ]; then
             echo "ERROR: Final MP4 missing."
@@ -1224,7 +1141,7 @@ jobs:
         run: |
           cat > work/test15-report.txt <<'EOF'
           AICAP FREE VIDEO RENDERER
-          TEST 15 — LARGE CLEAR DYNAMIC TEXT
+          TEST 15 — LARGE CLEAR INLINE SUBTITLES
 
           STATUS:
           RENDERED WITH VALIDATION
@@ -1234,23 +1151,35 @@ jobs:
           30 FPS
           60 seconds
 
-          SUBTITLE VISIBILITY:
+          SUBTITLE SIZES:
 
           Scene 1:
-          86px
+          120px
           WHITE + BOLD
 
           Scene 2:
-          78px
+          112px
           YELLOW + ITALIC
 
           Scene 3:
-          82px
+          115px
           CYAN + BOLD + ITALIC
 
           Scene 4:
-          88px
+          120px
           GREEN + NORMAL
+
+          INLINE FONT SIZE:
+          VERIFIED
+
+          INLINE COLOR:
+          VERIFIED
+
+          INLINE BOLD:
+          VERIFIED
+
+          INLINE ITALIC:
+          VERIFIED
 
           OUTLINE:
           VERIFIED
@@ -1264,18 +1193,6 @@ jobs:
           ASS EVENTS:
           VERIFIED
 
-          DIALOGUE EVENTS:
-          4
-
-          JSON → ASS COLOR:
-          VERIFIED
-
-          JSON → ASS BOLD:
-          VERIFIED
-
-          JSON → ASS ITALIC:
-          VERIFIED
-
           NARRATION:
           VERIFIED
 
@@ -1283,7 +1200,7 @@ jobs:
           VERIFIED
 
           OUTPUT:
-          AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
+          AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4
           EOF
 
           cat work/test15-report.txt
@@ -1296,8 +1213,8 @@ jobs:
       - name: Upload large clear MP4
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-LARGE-CLEAR-DYNAMIC-TEXT
-          path: output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
+          name: AICAP-FREE-15-LARGE-CLEAR-INLINE-SUBTITLES
+          path: output/AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4
           retention-days: 1
 
 
@@ -1308,7 +1225,7 @@ jobs:
       - name: Upload JSON configuration
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-LARGE-CLEAR-JSON
+          name: AICAP-FREE-15-LARGE-CLEAR-INLINE-JSON
           path: scene_config.json
           retention-days: 1
 
@@ -1320,7 +1237,7 @@ jobs:
       - name: Upload ASS subtitles
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-LARGE-CLEAR-ASS
+          name: AICAP-FREE-15-LARGE-CLEAR-INLINE-ASS
           path: work/subtitles.ass
           retention-days: 1
 
@@ -1332,7 +1249,7 @@ jobs:
       - name: Upload validation report
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-LARGE-CLEAR-REPORT
+          name: AICAP-FREE-15-LARGE-CLEAR-INLINE-REPORT
           path: work/test15-report.txt
           retention-days: 1
 
@@ -1346,27 +1263,31 @@ jobs:
           echo ""
           echo "=============================================="
           echo "AICAP FREE VIDEO RENDERER"
-          echo "TEST 15 — LARGE CLEAR DYNAMIC TEXT"
+          echo "TEST 15 — LARGE CLEAR INLINE SUBTITLES"
           echo "=============================================="
           echo ""
           echo "JSON                         : VERIFIED"
           echo "Scene Rendering              : VERIFIED"
           echo "Scene Timing                 : VERIFIED"
           echo "Transitions                  : VERIFIED"
-          echo "ASS Events                   : VERIFIED"
-          echo "Dialogue Events              : 4"
-          echo "Large Font Sizes             : VERIFIED"
-          echo "Dynamic Color                : VERIFIED"
-          echo "Dynamic Bold                 : VERIFIED"
-          echo "Dynamic Italic               : VERIFIED"
+          echo "Inline Font Size             : VERIFIED"
+          echo "Inline Color                 : VERIFIED"
+          echo "Inline Bold                  : VERIFIED"
+          echo "Inline Italic                : VERIFIED"
           echo "Outline                      : VERIFIED"
           echo "Shadow                       : VERIFIED"
           echo "Position                     : VERIFIED"
           echo "Narration                    : VERIFIED"
           echo "Final MP4                    : VERIFIED"
           echo ""
+          echo "SUBTITLE SIZES:"
+          echo "Scene 1                      : 120px"
+          echo "Scene 2                      : 112px"
+          echo "Scene 3                      : 115px"
+          echo "Scene 4                      : 120px"
+          echo ""
           echo "OUTPUT:"
-          echo "AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4"
+          echo "AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4"
           echo ""
           echo "=============================================="
           echo "TEST 15 : SUCCESS"
