@@ -47,9 +47,11 @@ jobs:
 
           command -v ffmpeg
           command -v jq
+          command -v python3
 
           ffmpeg -version | head -n 1
           jq --version
+          python3 --version
 
           echo "TOOLS : VERIFIED"
 
@@ -439,14 +441,10 @@ jobs:
             ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
             SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
             COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
-            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
 
             echo "Scene $ID"
             echo "Font size : $SIZE"
             echo "Color     : $COLOR"
-            echo "Bold      : $BOLD"
-            echo "Italic    : $ITALIC"
 
             if [ "$SIZE" -lt 100 ]; then
               echo "ERROR: Subtitle size is below 100."
@@ -759,265 +757,213 @@ jobs:
 
 
       # ==========================================================
-      # 16. GENERATE ASS WITH INLINE LARGE TEXT
+      # 16. GENERATE ASS DIRECTLY WITH PYTHON
       # ==========================================================
 
       - name: Generate large clear ASS subtitles
         shell: bash
         run: |
           echo "======================================"
-          echo "GENERATING LARGE CLEAR INLINE SUBTITLES"
+          echo "GENERATING LARGE CLEAR ASS SUBTITLES"
           echo "======================================"
 
-          cat > work/subtitles.ass <<'EOF'
-          [Script Info]
-          ScriptType: v4.00+
-          PlayResX: 1080
-          PlayResY: 1920
-          ScaledBorderAndShadow: yes
-          WrapStyle: 2
+          python3 <<'PY'
+          import json
+          from pathlib import Path
 
-          [V4+ Styles]
-          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-          Default,Arial,120,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,5,3,2,90,90,100,1
+          with open("scene_config.json", "r", encoding="utf-8") as f:
+              config = json.load(f)
 
-          [Events]
-          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-          EOF
+          Path("work").mkdir(exist_ok=True)
 
-          COUNT=$(jq '.scenes | length' scene_config.json)
+          # Exact ASS BGR colour values.
+          ASS_COLORS = {
+              "#FFFFFF": "&H00FFFFFF",
+              "#FFFF00": "&H0000FFFF",
+              "#00FFFF": "&H00FFFF00",
+              "#00FF00": "&H0000FF00"
+          }
 
-          for INDEX in $(seq 0 $((COUNT - 1)))
-          do
+          def ass_time(seconds):
+              hours = int(seconds // 3600)
+              minutes = int((seconds % 3600) // 60)
+              secs = seconds % 60
+              return f"{hours}:{minutes:02d}:{secs:05.2f}"
 
-            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+          lines = [
+              "[Script Info]",
+              "ScriptType: v4.00+",
+              "PlayResX: 1080",
+              "PlayResY: 1920",
+              "ScaledBorderAndShadow: yes",
+              "WrapStyle: 2",
+              "",
+              "[V4+ Styles]",
+              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+              "Default,Arial,120,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,5,3,2,90,90,100,1",
+              "",
+              "[Events]",
+              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+          ]
 
-            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
+          for scene in config["scenes"]:
 
-            if [ "$ENABLED" != "true" ]; then
-              continue
-            fi
+              subtitle = scene["subtitle"]
 
-            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
-            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+              if not subtitle.get("enabled", False):
+                  continue
 
-            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+              style = subtitle["style"]
 
-            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
-            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+              scene_id = scene["id"]
+              text = subtitle["text"]
 
-            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+              size = int(style["size"])
+              color_hex = style["color"].upper()
 
-            X=$(jq -r ".scenes[$INDEX].subtitle.style.position.x" scene_config.json)
-            Y=$(jq -r ".scenes[$INDEX].subtitle.style.position.y" scene_config.json)
+              if color_hex not in ASS_COLORS:
+                  raise ValueError(
+                      f"Unsupported subtitle colour in Scene {scene_id}: {color_hex}"
+                  )
 
-            OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
-            SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
+              ass_color = ASS_COLORS[color_hex]
 
-            HEX=${COLOR#\#}
+              bold = 1 if style.get("bold", False) else 0
+              italic = 1 if style.get("italic", False) else 0
 
-            RR=${HEX:0:2}
-            GG=${HEX:2:2}
-            BB=${HEX:4:2}
+              x = int(style["position"]["x"])
+              y = int(style["position"]["y"])
 
-            ASS_COLOR="&H00${BB}${GG}${RR}"
+              outline = int(style.get("outline", 5))
+              shadow = int(style.get("shadow", 3))
 
-            if [ "$BOLD" = "true" ]; then
-              ASS_BOLD="1"
-            else
-              ASS_BOLD="0"
-            fi
+              start = ass_time(scene["start"])
+              end = ass_time(scene["end"])
 
-            if [ "$ITALIC" = "true" ]; then
-              ASS_ITALIC="1"
-            else
-              ASS_ITALIC="0"
-            fi
+              # Escape ASS special braces in user text.
+              text = text.replace("{", r"\{").replace("}", r"\}")
 
-            START_H=$((START / 3600))
-            START_M=$(((START % 3600) / 60))
-            START_S=$((START % 60))
+              inline = (
+                  f"{{\\fs{size}"
+                  f"\\c{ass_color}"
+                  f"\\b{bold}"
+                  f"\\i{italic}"
+                  f"\\bord{outline}"
+                  f"\\shad{shadow}"
+                  f"\\q2"
+                  f"\\pos({x},{y})}}"
+              )
 
-            END_H=$((END / 3600))
-            END_M=$(((END % 3600) / 60))
-            END_S=$((END % 60))
+              dialogue = (
+                  f"Dialogue: 0,{start},{end},Default,,0,0,0,,"
+                  f"{inline}{text}"
+              )
 
-            START_ASS=$(printf "%d:%02d:%05.2f" \
-              "$START_H" \
-              "$START_M" \
-              "$START_S")
+              lines.append(dialogue)
 
-            END_ASS=$(printf "%d:%02d:%05.2f" \
-              "$END_H" \
-              "$END_M" \
-              "$END_S")
+              print(f"Scene {scene_id}")
+              print(f"  Font size : {size}")
+              print(f"  Colour    : {color_hex}")
+              print(f"  ASS color : {ass_color}")
+              print(f"  Bold      : {bold}")
+              print(f"  Italic    : {italic}")
+              print(f"  Position  : {x},{y}")
+              print()
 
-            ESCAPED_TEXT=$(printf '%s' "$TEXT" | \
-              sed 's/{/\\{/g; s/}/\\}/g')
+          ass_path = Path("work/subtitles.ass")
 
-            INLINE_TAG="{\\fs${SIZE}\\c${ASS_COLOR}\\b${ASS_BOLD}\\i${ASS_ITALIC}\\bord${OUTLINE}\\shad${SHADOW}\\q2\\pos(${X},${Y})}"
+          ass_path.write_text(
+              "\n".join(lines) + "\n",
+              encoding="utf-8"
+          )
 
-            printf \
-              "Dialogue: 0,%s,%s,Default,,0,0,0,,%s%s\n" \
-              "$START_ASS" \
-              "$END_ASS" \
-              "$INLINE_TAG" \
-              "$ESCAPED_TEXT" \
-              >> work/subtitles.ass
+          print("======================================")
+          print("GENERATED ASS FILE")
+          print("======================================")
 
-            echo "Scene $ID : ${SIZE}px"
-            echo "Color    : $COLOR"
-            echo "Bold     : $BOLD"
-            echo "Italic   : $ITALIC"
+          print(ass_path.read_text(encoding="utf-8"))
+          PY
 
-          done
-
-          echo ""
-          echo "======================================"
-          echo "GENERATED ASS"
-          echo "======================================"
-
-          cat work/subtitles.ass
+          echo "ASS GENERATION : COMPLETE"
 
 
       # ==========================================================
-      # 17. VALIDATE ASS STRUCTURE
+      # 17. VALIDATE ASS DIRECTLY WITH PYTHON
       # ==========================================================
 
-      - name: Validate ASS subtitle structure
-        run: |
-          echo "======================================"
-          echo "ASS STRUCTURE VALIDATION"
-          echo "======================================"
-
-          if ! grep -qF '[Events]' work/subtitles.ass; then
-            echo "ERROR: [Events] section missing."
-            exit 1
-          fi
-
-          DIALOGUE_COUNT=$(grep -c '^Dialogue:' work/subtitles.ass || true)
-
-          echo "Dialogue events : $DIALOGUE_COUNT"
-
-          if [ "$DIALOGUE_COUNT" -ne 4 ]; then
-            echo "ERROR: Expected 4 dialogue events."
-            exit 1
-          fi
-
-          echo "ASS STRUCTURE : VALID"
-
-      # ==========================================================
-      # 18. ROBUSTLY VERIFY INLINE ASS FORMATTING
-      # ==========================================================
-
-      - name: Verify inline ASS formatting
+      - name: Validate generated ASS
         shell: bash
         run: |
           echo "======================================"
-          echo "INLINE ASS FORMATTING VERIFICATION"
+          echo "ASS VALIDATION"
           echo "======================================"
 
           python3 <<'PY'
           from pathlib import Path
 
-          ass_file = Path("work/subtitles.ass")
+          path = Path("work/subtitles.ass")
 
-          if not ass_file.exists():
-              print("ERROR: subtitles.ass not found.")
+          if not path.exists():
+              print("ERROR: subtitles.ass does not exist.")
               raise SystemExit(1)
 
-          text = ass_file.read_text(encoding="utf-8")
+          text = path.read_text(encoding="utf-8")
 
-          required_sizes = [
-              r"\fs120",
-              r"\fs112",
-              r"\fs115",
-              r"\fs120"
-          ]
-
-          required_colors = [
-              r"\c&H00FFFFFF&",
-              r"\c&H0000FFFF&",
-              r"\c&H00FFFF00&",
-              r"\c&H0000FF00&"
-          ]
-
-          required_styles = [
-              r"\b1\i0",
-              r"\b0\i1",
-              r"\b1\i1",
-              r"\b0\i0"
-          ]
-
-          required_effects = [
-              r"\bord5",
-              r"\shad3"
-          ]
-
-          dialogue_lines = [
+          dialogue = [
               line for line in text.splitlines()
               if line.startswith("Dialogue:")
           ]
 
-          print(f"Dialogue events : {len(dialogue_lines)}")
+          print(f"Dialogue events : {len(dialogue)}")
 
-          if len(dialogue_lines) != 4:
-              print("ERROR: Expected exactly 4 subtitle events.")
+          if len(dialogue) != 4:
+              print("ERROR: Expected 4 Dialogue events.")
               raise SystemExit(1)
 
-          print("")
-          print("FONT SIZE CHECK")
-          print("----------------")
+          expected = [
+              (r"\fs120", r"\c&H00FFFFFF&", r"\b1", r"\i0"),
+              (r"\fs112", r"\c&H0000FFFF&", r"\b0", r"\i1"),
+              (r"\fs115", r"\c&H00FFFF00&", r"\b1", r"\i1"),
+              (r"\fs120", r"\c&H0000FF00&", r"\b0", r"\i0")
+          ]
 
-          for value in required_sizes:
-              if value not in text:
-                  print(f"ERROR: Missing {value}")
+          for index, values in enumerate(expected, start=1):
+
+              line = dialogue[index - 1]
+
+              print("")
+              print(f"Scene {index} verification")
+
+              for value in values:
+
+                  if value not in line:
+                      print(f"ERROR: Missing {value}")
+                      print("ACTUAL DIALOGUE:")
+                      print(line)
+                      raise SystemExit(1)
+
+                  print(f"{value} : VERIFIED")
+
+              if r"\bord5" not in line:
+                  print("ERROR: Outline missing.")
                   raise SystemExit(1)
 
-              print(f"{value} : VERIFIED")
-
-          print("")
-          print("COLOR CHECK")
-          print("-----------")
-
-          for value in required_colors:
-              if value not in text:
-                  print(f"ERROR: Missing {value}")
+              if r"\shad3" not in line:
+                  print("ERROR: Shadow missing.")
                   raise SystemExit(1)
 
-              print(f"{value} : VERIFIED")
-
-          print("")
-          print("BOLD / ITALIC CHECK")
-          print("-------------------")
-
-          for value in required_styles:
-              if value not in text:
-                  print(f"ERROR: Missing {value}")
-                  raise SystemExit(1)
-
-              print(f"{value} : VERIFIED")
-
-          print("")
-          print("OUTLINE / SHADOW CHECK")
-          print("----------------------")
-
-          for value in required_effects:
-              if value not in text:
-                  print(f"ERROR: Missing {value}")
-                  raise SystemExit(1)
-
-              print(f"{value} : VERIFIED")
+              print(r"\bord5 : VERIFIED")
+              print(r"\shad3 : VERIFIED")
 
           print("")
           print("======================================")
-          print("INLINE ASS FORMATTING : VERIFIED")
+          print("ASS FORMAT : FULLY VERIFIED")
           print("======================================")
           PY
 
+
       # ==========================================================
-      # 22. BURN SUBTITLES
+      # 18. BURN SUBTITLES
       # ==========================================================
 
       - name: Burn large clear subtitles
@@ -1040,7 +986,7 @@ jobs:
 
 
       # ==========================================================
-      # 23. VERIFY SUBTITLE VIDEO
+      # 19. VERIFY SUBTITLE VIDEO
       # ==========================================================
 
       - name: Verify subtitled video
@@ -1066,7 +1012,7 @@ jobs:
 
 
       # ==========================================================
-      # 24. ADD NARRATION
+      # 20. ADD NARRATION
       # ==========================================================
 
       - name: Add narration
@@ -1093,7 +1039,7 @@ jobs:
 
 
       # ==========================================================
-      # 25. FINAL VALIDATION
+      # 21. FINAL VALIDATION
       # ==========================================================
 
       - name: Validate final video
@@ -1142,7 +1088,7 @@ jobs:
 
 
       # ==========================================================
-      # 26. CREATE REPORT
+      # 22. CREATE REPORT
       # ==========================================================
 
       - name: Create Test 15 report
@@ -1215,7 +1161,7 @@ jobs:
 
 
       # ==========================================================
-      # 27. UPLOAD MP4
+      # 23. UPLOAD MP4
       # ==========================================================
 
       - name: Upload large clear MP4
@@ -1227,7 +1173,7 @@ jobs:
 
 
       # ==========================================================
-      # 28. UPLOAD JSON
+      # 24. UPLOAD JSON
       # ==========================================================
 
       - name: Upload JSON configuration
@@ -1239,7 +1185,7 @@ jobs:
 
 
       # ==========================================================
-      # 29. UPLOAD ASS
+      # 25. UPLOAD ASS
       # ==========================================================
 
       - name: Upload ASS subtitles
@@ -1251,7 +1197,7 @@ jobs:
 
 
       # ==========================================================
-      # 30. UPLOAD REPORT
+      # 26. UPLOAD REPORT
       # ==========================================================
 
       - name: Upload validation report
@@ -1263,7 +1209,7 @@ jobs:
 
 
       # ==========================================================
-      # 31. FINAL RESULT
+      # 27. FINAL RESULT
       # ==========================================================
 
       - name: Test 15 final result
@@ -1278,6 +1224,7 @@ jobs:
           echo "Scene Rendering              : VERIFIED"
           echo "Scene Timing                 : VERIFIED"
           echo "Transitions                  : VERIFIED"
+          echo "ASS Generation               : VERIFIED"
           echo "Inline Font Size             : VERIFIED"
           echo "Inline Color                 : VERIFIED"
           echo "Inline Bold                  : VERIFIED"
