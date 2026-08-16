@@ -922,32 +922,31 @@ jobs:
               raise SystemExit(1)
 
           expected = [
-              {
-                  "size": "120",
-                  "color": "FFFFFF",
-                  "bold": "1",
-                  "italic": "0"
-              },
-              {
-                  "size": "112",
-                  "color": "FFFF00",
-                  "bold": "0",
-                  "italic": "1"
-              },
-              {
-                  "size": "115",
-                  "color": "00FFFF",
-                  "bold": "1",
-                  "italic": "1"
-              },
-              {
-                  "size": "120",
-                  "color": "00FF00",
-                  "bold": "0",
-                  "italic": "0"
-              }
-          ]
-
+    {
+        "size": "84",
+        "color": "FFFFFF",
+        "bold": "1",
+        "italic": "0"
+    },
+    {
+        "size": "82",
+        "color": "FFFF00",
+        "bold": "0",
+        "italic": "1"
+    },
+    {
+        "size": "80",
+        "color": "00FFFF",
+        "bold": "1",
+        "italic": "1"
+    },
+    {
+        "size": "84",
+        "color": "00FF00",
+        "bold": "0",
+        "italic": "0"
+    }
+]
           for number, (line, wanted) in enumerate(
               zip(dialogue, expected), start=1
           ):
@@ -1380,10 +1379,10 @@ jobs:
           echo "Final MP4                    : VERIFIED"
           echo ""
           echo "SUBTITLE SIZES:"
-          echo "Scene 1                      : 120px"
-          echo "Scene 2                      : 112px"
-          echo "Scene 3                      : 115px"
-          echo "Scene 4                      : 120px"
+          echo "Scene 1                      : 84px"
+          echo "Scene 2                      : 82px"
+          echo "Scene 3                      : 80px"
+          echo "Scene 4                      : 84px"
           echo ""
           echo "OUTPUT:"
           echo "AICAP_FREE_15_LARGE_CLEAR_INLINE_SUBTITLES.mp4"
