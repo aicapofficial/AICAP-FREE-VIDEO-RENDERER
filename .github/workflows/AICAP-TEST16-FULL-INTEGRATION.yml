@@ -1259,7 +1259,7 @@ jobs:
             SCENE=$3
 
             PACKETS=$(ffprobe -v error \
-              -ss "$START" -t "$LENGTH" \
+              -read_intervals "${START}%+${LENGTH}" \
               -select_streams a:0 \
               -show_entries packet=pts_time \
               -of csv=p=0 "$VIDEO" | head -n 1)
