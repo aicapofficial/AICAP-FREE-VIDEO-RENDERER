@@ -1,4 +1,4 @@
-name: AICAP FREE RENDER — 15 — LARGE CLEAR DYNAMIC SUBTITLES
+name: AICAP FREE VIDEO RENDER — 15 — LARGE CLEAR DYNAMIC SUBTITLES
 
 on:
   workflow_dispatch:
@@ -266,7 +266,7 @@ jobs:
 
 
       # ==========================================================
-      # 06. READ CONFIGURATION
+      # 06. READ GLOBAL CONFIGURATION
       # ==========================================================
 
       - name: Read global configuration
@@ -438,11 +438,8 @@ jobs:
 
             ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
             SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
-
             COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
-
             BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-
             ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
 
             echo "Scene $ID"
@@ -769,7 +766,7 @@ jobs:
         shell: bash
         run: |
           echo "======================================"
-          echo "GENERATING INLINE LARGE CLEAR SUBTITLES"
+          echo "GENERATING LARGE CLEAR INLINE SUBTITLES"
           echo "======================================"
 
           cat > work/subtitles.ass <<'EOF'
@@ -885,7 +882,7 @@ jobs:
 
 
       # ==========================================================
-      # 17. VALIDATE ASS
+      # 17. VALIDATE ASS STRUCTURE
       # ==========================================================
 
       - name: Validate ASS subtitle structure
@@ -894,7 +891,7 @@ jobs:
           echo "ASS STRUCTURE VALIDATION"
           echo "======================================"
 
-          if ! grep -q '^\[Events\]$' work/subtitles.ass; then
+          if ! grep -qF '[Events]' work/subtitles.ass; then
             echo "ERROR: [Events] section missing."
             exit 1
           fi
@@ -928,7 +925,7 @@ jobs:
           for SIZE in $EXPECTED_SIZES
           do
 
-            if ! grep -q "\\\\fs${SIZE}" work/subtitles.ass; then
+            if ! grep -qF "\\fs${SIZE}" work/subtitles.ass; then
               echo "ERROR: Inline font size ${SIZE} not found."
               exit 1
             fi
@@ -952,25 +949,30 @@ jobs:
           echo "INLINE COLOR VERIFICATION"
           echo "======================================"
 
-          if ! grep -q '\\c&H00FFFFFF&' work/subtitles.ass; then
+          if ! grep -qF '\c&H00FFFFFF&' work/subtitles.ass; then
             echo "ERROR: White subtitle color missing."
             exit 1
           fi
 
-          if ! grep -q '\\c&H0000FFFF&' work/subtitles.ass; then
+          if ! grep -qF '\c&H0000FFFF&' work/subtitles.ass; then
             echo "ERROR: Yellow subtitle color missing."
             exit 1
           fi
 
-          if ! grep -q '\\c&H00FFFF00&' work/subtitles.ass; then
+          if ! grep -qF '\c&H00FFFF00&' work/subtitles.ass; then
             echo "ERROR: Cyan subtitle color missing."
             exit 1
           fi
 
-          if ! grep -q '\\c&H0000FF00&' work/subtitles.ass; then
+          if ! grep -qF '\c&H0000FF00&' work/subtitles.ass; then
             echo "ERROR: Green subtitle color missing."
             exit 1
           fi
+
+          echo "WHITE  : VERIFIED"
+          echo "YELLOW : VERIFIED"
+          echo "CYAN   : VERIFIED"
+          echo "GREEN  : VERIFIED"
 
           echo "INLINE COLORS : VERIFIED"
 
@@ -985,31 +987,60 @@ jobs:
           echo "INLINE STYLE VERIFICATION"
           echo "======================================"
 
-          if ! grep -q '\\b1\\i0' work/subtitles.ass; then
+          if ! grep -qF '\b1\i0' work/subtitles.ass; then
             echo "ERROR: Bold style missing."
             exit 1
           fi
 
-          if ! grep -q '\\b0\\i1' work/subtitles.ass; then
+          if ! grep -qF '\b0\i1' work/subtitles.ass; then
             echo "ERROR: Italic style missing."
             exit 1
           fi
 
-          if ! grep -q '\\b1\\i1' work/subtitles.ass; then
+          if ! grep -qF '\b1\i1' work/subtitles.ass; then
             echo "ERROR: Bold + Italic style missing."
             exit 1
           fi
 
-          if ! grep -q '\\b0\\i0' work/subtitles.ass; then
+          if ! grep -qF '\b0\i0' work/subtitles.ass; then
             echo "ERROR: Normal style missing."
             exit 1
           fi
+
+          echo "BOLD           : VERIFIED"
+          echo "ITALIC         : VERIFIED"
+          echo "BOLD + ITALIC  : VERIFIED"
+          echo "NORMAL         : VERIFIED"
 
           echo "INLINE BOLD / ITALIC : VERIFIED"
 
 
       # ==========================================================
-      # 21. BURN SUBTITLES
+      # 21. VERIFY OUTLINE AND SHADOW
+      # ==========================================================
+
+      - name: Verify outline and shadow
+        run: |
+          echo "======================================"
+          echo "OUTLINE / SHADOW VERIFICATION"
+          echo "======================================"
+
+          if ! grep -qF '\bord5' work/subtitles.ass; then
+            echo "ERROR: Outline setting missing."
+            exit 1
+          fi
+
+          if ! grep -qF '\shad3' work/subtitles.ass; then
+            echo "ERROR: Shadow setting missing."
+            exit 1
+          fi
+
+          echo "OUTLINE : VERIFIED"
+          echo "SHADOW  : VERIFIED"
+
+
+      # ==========================================================
+      # 22. BURN SUBTITLES
       # ==========================================================
 
       - name: Burn large clear subtitles
@@ -1032,7 +1063,7 @@ jobs:
 
 
       # ==========================================================
-      # 22. VERIFY SUBTITLE VIDEO
+      # 23. VERIFY SUBTITLE VIDEO
       # ==========================================================
 
       - name: Verify subtitled video
@@ -1058,7 +1089,7 @@ jobs:
 
 
       # ==========================================================
-      # 23. ADD NARRATION
+      # 24. ADD NARRATION
       # ==========================================================
 
       - name: Add narration
@@ -1085,7 +1116,7 @@ jobs:
 
 
       # ==========================================================
-      # 24. FINAL VALIDATION
+      # 25. FINAL VALIDATION
       # ==========================================================
 
       - name: Validate final video
@@ -1134,7 +1165,7 @@ jobs:
 
 
       # ==========================================================
-      # 25. CREATE REPORT
+      # 26. CREATE REPORT
       # ==========================================================
 
       - name: Create Test 15 report
@@ -1207,7 +1238,7 @@ jobs:
 
 
       # ==========================================================
-      # 26. UPLOAD MP4
+      # 27. UPLOAD MP4
       # ==========================================================
 
       - name: Upload large clear MP4
@@ -1219,7 +1250,7 @@ jobs:
 
 
       # ==========================================================
-      # 27. UPLOAD JSON
+      # 28. UPLOAD JSON
       # ==========================================================
 
       - name: Upload JSON configuration
@@ -1231,7 +1262,7 @@ jobs:
 
 
       # ==========================================================
-      # 28. UPLOAD ASS
+      # 29. UPLOAD ASS
       # ==========================================================
 
       - name: Upload ASS subtitles
@@ -1243,7 +1274,7 @@ jobs:
 
 
       # ==========================================================
-      # 29. UPLOAD REPORT
+      # 30. UPLOAD REPORT
       # ==========================================================
 
       - name: Upload validation report
@@ -1255,7 +1286,7 @@ jobs:
 
 
       # ==========================================================
-      # 30. FINAL RESULT
+      # 31. FINAL RESULT
       # ==========================================================
 
       - name: Test 15 final result
