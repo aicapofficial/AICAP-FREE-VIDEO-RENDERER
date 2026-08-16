@@ -907,137 +907,114 @@ jobs:
 
           echo "ASS STRUCTURE : VALID"
 
-
       # ==========================================================
-      # 18. VERIFY INLINE FONT SIZE
+      # 18. ROBUSTLY VERIFY INLINE ASS FORMATTING
       # ==========================================================
 
-      - name: Verify inline font sizes
+      - name: Verify inline ASS formatting
+        shell: bash
         run: |
           echo "======================================"
-          echo "INLINE FONT SIZE VERIFICATION"
+          echo "INLINE ASS FORMATTING VERIFICATION"
           echo "======================================"
 
-          EXPECTED_SIZES="120 112 115 120"
+          python3 <<'PY'
+          from pathlib import Path
 
-          INDEX=1
+          ass_file = Path("work/subtitles.ass")
 
-          for SIZE in $EXPECTED_SIZES
-          do
+          if not ass_file.exists():
+              print("ERROR: subtitles.ass not found.")
+              raise SystemExit(1)
 
-            if ! grep -qF "\\fs${SIZE}" work/subtitles.ass; then
-              echo "ERROR: Inline font size ${SIZE} not found."
-              exit 1
-            fi
+          text = ass_file.read_text(encoding="utf-8")
 
-            echo "Scene $INDEX : ${SIZE}px VERIFIED"
+          required_sizes = [
+              r"\fs120",
+              r"\fs112",
+              r"\fs115",
+              r"\fs120"
+          ]
 
-            INDEX=$((INDEX + 1))
+          required_colors = [
+              r"\c&H00FFFFFF&",
+              r"\c&H0000FFFF&",
+              r"\c&H00FFFF00&",
+              r"\c&H0000FF00&"
+          ]
 
-          done
+          required_styles = [
+              r"\b1\i0",
+              r"\b0\i1",
+              r"\b1\i1",
+              r"\b0\i0"
+          ]
 
-          echo "INLINE FONT SIZES : VERIFIED"
+          required_effects = [
+              r"\bord5",
+              r"\shad3"
+          ]
 
+          dialogue_lines = [
+              line for line in text.splitlines()
+              if line.startswith("Dialogue:")
+          ]
 
-      # ==========================================================
-      # 19. VERIFY INLINE COLORS
-      # ==========================================================
+          print(f"Dialogue events : {len(dialogue_lines)}")
 
-      - name: Verify inline subtitle colors
-        run: |
-          echo "======================================"
-          echo "INLINE COLOR VERIFICATION"
-          echo "======================================"
+          if len(dialogue_lines) != 4:
+              print("ERROR: Expected exactly 4 subtitle events.")
+              raise SystemExit(1)
 
-          if ! grep -qF '\c&H00FFFFFF&' work/subtitles.ass; then
-            echo "ERROR: White subtitle color missing."
-            exit 1
-          fi
+          print("")
+          print("FONT SIZE CHECK")
+          print("----------------")
 
-          if ! grep -qF '\c&H0000FFFF&' work/subtitles.ass; then
-            echo "ERROR: Yellow subtitle color missing."
-            exit 1
-          fi
+          for value in required_sizes:
+              if value not in text:
+                  print(f"ERROR: Missing {value}")
+                  raise SystemExit(1)
 
-          if ! grep -qF '\c&H00FFFF00&' work/subtitles.ass; then
-            echo "ERROR: Cyan subtitle color missing."
-            exit 1
-          fi
+              print(f"{value} : VERIFIED")
 
-          if ! grep -qF '\c&H0000FF00&' work/subtitles.ass; then
-            echo "ERROR: Green subtitle color missing."
-            exit 1
-          fi
+          print("")
+          print("COLOR CHECK")
+          print("-----------")
 
-          echo "WHITE  : VERIFIED"
-          echo "YELLOW : VERIFIED"
-          echo "CYAN   : VERIFIED"
-          echo "GREEN  : VERIFIED"
+          for value in required_colors:
+              if value not in text:
+                  print(f"ERROR: Missing {value}")
+                  raise SystemExit(1)
 
-          echo "INLINE COLORS : VERIFIED"
+              print(f"{value} : VERIFIED")
 
+          print("")
+          print("BOLD / ITALIC CHECK")
+          print("-------------------")
 
-      # ==========================================================
-      # 20. VERIFY INLINE STYLES
-      # ==========================================================
+          for value in required_styles:
+              if value not in text:
+                  print(f"ERROR: Missing {value}")
+                  raise SystemExit(1)
 
-      - name: Verify inline subtitle styles
-        run: |
-          echo "======================================"
-          echo "INLINE STYLE VERIFICATION"
-          echo "======================================"
+              print(f"{value} : VERIFIED")
 
-          if ! grep -qF '\b1\i0' work/subtitles.ass; then
-            echo "ERROR: Bold style missing."
-            exit 1
-          fi
+          print("")
+          print("OUTLINE / SHADOW CHECK")
+          print("----------------------")
 
-          if ! grep -qF '\b0\i1' work/subtitles.ass; then
-            echo "ERROR: Italic style missing."
-            exit 1
-          fi
+          for value in required_effects:
+              if value not in text:
+                  print(f"ERROR: Missing {value}")
+                  raise SystemExit(1)
 
-          if ! grep -qF '\b1\i1' work/subtitles.ass; then
-            echo "ERROR: Bold + Italic style missing."
-            exit 1
-          fi
+              print(f"{value} : VERIFIED")
 
-          if ! grep -qF '\b0\i0' work/subtitles.ass; then
-            echo "ERROR: Normal style missing."
-            exit 1
-          fi
-
-          echo "BOLD           : VERIFIED"
-          echo "ITALIC         : VERIFIED"
-          echo "BOLD + ITALIC  : VERIFIED"
-          echo "NORMAL         : VERIFIED"
-
-          echo "INLINE BOLD / ITALIC : VERIFIED"
-
-
-      # ==========================================================
-      # 21. VERIFY OUTLINE AND SHADOW
-      # ==========================================================
-
-      - name: Verify outline and shadow
-        run: |
-          echo "======================================"
-          echo "OUTLINE / SHADOW VERIFICATION"
-          echo "======================================"
-
-          if ! grep -qF '\bord5' work/subtitles.ass; then
-            echo "ERROR: Outline setting missing."
-            exit 1
-          fi
-
-          if ! grep -qF '\shad3' work/subtitles.ass; then
-            echo "ERROR: Shadow setting missing."
-            exit 1
-          fi
-
-          echo "OUTLINE : VERIFIED"
-          echo "SHADOW  : VERIFIED"
-
+          print("")
+          print("======================================")
+          print("INLINE ASS FORMATTING : VERIFIED")
+          print("======================================")
+          PY
 
       # ==========================================================
       # 22. BURN SUBTITLES
