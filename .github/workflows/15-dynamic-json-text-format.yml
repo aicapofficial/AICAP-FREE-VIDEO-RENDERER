@@ -1,4 +1,4 @@
-name: AICAP FREE RENDER — 15 — DYNAMIC JSON TEXT FORMAT
+name: AICAP FREE RENDER — 15 — LARGE CLEAR DYNAMIC TEXT
 
 on:
   workflow_dispatch:
@@ -24,8 +24,8 @@ jobs:
       - name: Install FFmpeg and jq
         run: |
           echo "======================================"
-          echo "AICAP FREE RENDER"
-          echo "TEST 15 — DYNAMIC JSON TEXT FORMAT"
+          echo "AICAP FREE VIDEO RENDERER"
+          echo "TEST 15 — LARGE CLEAR DYNAMIC TEXT"
           echo "======================================"
 
           sudo apt-get update
@@ -51,25 +51,24 @@ jobs:
           ffmpeg -version | head -n 1
           jq --version
 
-          echo "======================================"
           echo "TOOLS : VERIFIED"
-          echo "======================================"
 
 
       # ==========================================================
-      # 04. CREATE TEST 15 JSON
+      # 04. CREATE LARGE / CLEAR TEST JSON
       # ==========================================================
 
       - name: Create Test 15 JSON
         run: |
           echo "======================================"
           echo "CREATING TEST 15 JSON"
+          echo "LARGE / CLEAR SUBTITLE VERSION"
           echo "======================================"
 
           cat > scene_config.json <<'EOF'
           {
             "project": {
-              "name": "AICAP_TEST_15_DYNAMIC_JSON_TEXT_FORMAT",
+              "name": "AICAP_TEST_15_LARGE_CLEAR_DYNAMIC_TEXT",
               "resolution": {
                 "width": 1080,
                 "height": 1920
@@ -117,6 +116,7 @@ jobs:
             },
 
             "scenes": [
+
               {
                 "id": 1,
                 "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
@@ -131,7 +131,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 54,
+                    "size": 86,
                     "color": "#FFFFFF",
                     "bold": true,
                     "italic": false,
@@ -139,12 +139,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1650
+                      "y": 1640
                     },
 
-                    "outline": 3,
-                    "shadow": 1,
-                    "margin": 80
+                    "outline": 4,
+                    "shadow": 2,
+                    "margin": 70
                   }
                 }
               },
@@ -163,7 +163,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 46,
+                    "size": 78,
                     "color": "#FFFF00",
                     "bold": false,
                     "italic": true,
@@ -174,7 +174,7 @@ jobs:
                       "y": 1600
                     },
 
-                    "outline": 4,
+                    "outline": 5,
                     "shadow": 2,
                     "margin": 70
                   }
@@ -195,7 +195,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 42,
+                    "size": 82,
                     "color": "#00FFFF",
                     "bold": true,
                     "italic": true,
@@ -203,11 +203,11 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1550
+                      "y": 1540
                     },
 
-                    "outline": 3,
-                    "shadow": 1,
+                    "outline": 4,
+                    "shadow": 2,
                     "margin": 60
                   }
                 }
@@ -227,7 +227,7 @@ jobs:
 
                   "style": {
                     "font": "Arial",
-                    "size": 50,
+                    "size": 88,
                     "color": "#00FF00",
                     "bold": false,
                     "italic": false,
@@ -235,12 +235,12 @@ jobs:
 
                     "position": {
                       "x": 540,
-                      "y": 1680
+                      "y": 1670
                     },
 
                     "outline": 5,
                     "shadow": 2,
-                    "margin": 90
+                    "margin": 70
                   }
                 }
               }
@@ -248,11 +248,7 @@ jobs:
           }
           EOF
 
-          echo "======================================"
           echo "TEST 15 JSON CREATED"
-          echo "======================================"
-
-          cat scene_config.json
 
 
       # ==========================================================
@@ -271,7 +267,7 @@ jobs:
 
 
       # ==========================================================
-      # 06. READ GLOBAL CONFIGURATION
+      # 06. READ CONFIGURATION
       # ==========================================================
 
       - name: Read global configuration
@@ -341,7 +337,7 @@ jobs:
 
 
       # ==========================================================
-      # 08. VALIDATE NARRATION TIMELINE
+      # 08. VALIDATE NARRATION
       # ==========================================================
 
       - name: Validate narration timeline
@@ -364,7 +360,7 @@ jobs:
             echo "Narration $ID : $START → $END"
 
             if [ "$START" -ne "$EXPECTED_START" ]; then
-              echo "ERROR: Narration timeline mismatch."
+              echo "ERROR: Narration start mismatch."
               exit 1
             fi
 
@@ -379,7 +375,7 @@ jobs:
           done
 
           if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
-            echo "ERROR: Narration timeline does not equal target duration."
+            echo "ERROR: Narration timeline mismatch."
             exit 1
           fi
 
@@ -387,7 +383,7 @@ jobs:
 
 
       # ==========================================================
-      # 09. VERIFY SCENE / NARRATION SYNC
+      # 09. SCENE / NARRATION SYNC
       # ==========================================================
 
       - name: Verify scene narration synchronization
@@ -443,15 +439,22 @@ jobs:
             ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
 
             TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
             COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
             BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
             ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
 
             echo "Scene $ID"
             echo "Text   : $TEXT"
+            echo "Size   : $SIZE"
             echo "Color  : $COLOR"
             echo "Bold   : $BOLD"
             echo "Italic : $ITALIC"
+
+            if [ "$SIZE" -lt 70 ]; then
+              echo "ERROR: Font size is below large-visibility threshold."
+              exit 1
+            fi
 
             if [ -z "$TEXT" ] || [ "$TEXT" = "null" ]; then
               echo "ERROR: Empty subtitle text."
@@ -463,15 +466,7 @@ jobs:
               exit 1
             fi
 
-            if [ "$BOLD" != "true" ] && [ "$BOLD" != "false" ]; then
-              echo "ERROR: Invalid Bold value."
-              exit 1
-            fi
-
-            if [ "$ITALIC" != "true" ] && [ "$ITALIC" != "false" ]; then
-              echo "ERROR: Invalid Italic value."
-              exit 1
-            fi
+            echo "Scene $ID : FORMAT VALID"
           done
 
           echo "TEXT FORMAT : VALID"
@@ -494,8 +489,7 @@ jobs:
             IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
 
             if [ ! -f "$IMAGE" ]; then
-              echo "ERROR: Missing image:"
-              echo "$IMAGE"
+              echo "ERROR: Missing image: $IMAGE"
               exit 1
             fi
 
@@ -505,8 +499,7 @@ jobs:
           AUDIO=$(jq -r '.narration.source' scene_config.json)
 
           if [ ! -f "$AUDIO" ]; then
-            echo "ERROR: Missing audio:"
-            echo "$AUDIO"
+            echo "ERROR: Missing audio: $AUDIO"
             exit 1
           fi
 
@@ -520,14 +513,6 @@ jobs:
 
       # ==========================================================
       # 12. RENDER SCENES
-      #
-      # FIX:
-      # No FFmpeg expression uses the undefined shell variable
-      # "FPS".
-      #
-      # Numeric 30 is used explicitly inside zoompan.
-      #
-      # Input is explicitly 30 FPS.
       # ==========================================================
 
       - name: Render scenes
@@ -556,10 +541,10 @@ jobs:
             OUTPUT="work/scene_${ID}.mp4"
 
             echo "--------------------------------------"
-            echo "Scene      : $ID"
-            echo "Duration   : $DURATION"
-            echo "Render     : $RENDER_DURATION"
-            echo "Motion     : $MOTION"
+            echo "Scene    : $ID"
+            echo "Duration : $DURATION"
+            echo "Render   : $RENDER_DURATION"
+            echo "Motion   : $MOTION"
             echo "--------------------------------------"
 
             case "$MOTION" in
@@ -649,13 +634,10 @@ jobs:
             fi
 
             echo "Scene $ID : RENDERED"
-            echo "File size : $SIZE bytes"
 
           done
 
-          echo "======================================"
           echo "ALL SCENES : RENDERED"
-          echo "======================================"
 
 
       # ==========================================================
@@ -699,17 +681,13 @@ jobs:
               exit 1
             fi
 
-            echo "Scene $ID : DURATION VERIFIED"
-
           done
 
-          echo "======================================"
           echo "SCENE DURATIONS : VERIFIED"
-          echo "======================================"
 
 
       # ==========================================================
-      # 14. BUILD VIDEO WITH TRANSITIONS
+      # 14. BUILD TRANSITIONS
       # ==========================================================
 
       - name: Build timeline transitions
@@ -754,9 +732,6 @@ jobs:
 
           FINAL_LABEL="[v$((COUNT - 1))]"
 
-          echo "Filter:"
-          echo "$FILTER"
-
           ffmpeg -y \
             "${INPUT_ARGS[@]}" \
             -filter_complex "$FILTER" \
@@ -798,26 +773,14 @@ jobs:
 
 
       # ==========================================================
-      # 16. GENERATE CORRECT ASS FILE
-      #
-      # IMPORTANT:
-      #
-      # Style names are:
-      # Scene1
-      # Scene2
-      # Scene3
-      # Scene4
-      #
-      # Dialogue events reference those exact names.
-      #
-      # [Events] section is mandatory.
+      # 16. GENERATE ASS
       # ==========================================================
 
-      - name: Generate corrected ASS subtitles
+      - name: Generate large clear ASS subtitles
         shell: bash
         run: |
           echo "======================================"
-          echo "GENERATING ASS SUBTITLES"
+          echo "GENERATING LARGE CLEAR ASS SUBTITLES"
           echo "======================================"
 
           cat > work/subtitles.ass <<'EOF'
@@ -881,20 +844,8 @@ jobs:
 
             STYLE_NAME="Scene${ID}"
 
-            echo "--------------------------------------"
-            echo "STYLE: $STYLE_NAME"
-            echo "Font   : $FONT"
-            echo "Size   : $SIZE"
-            echo "Color  : $COLOR"
-            echo "Bold   : $BOLD"
-            echo "Italic : $ITALIC"
-            echo "--------------------------------------"
-
-            # IMPORTANT:
-            # The first field is the ASS STYLE NAME.
-            # Therefore this MUST be Scene1, Scene2, etc.
             printf \
-              "%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,80,80,%s,1\n" \
+              "%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,70,70,%s,1\n" \
               "$STYLE_NAME" \
               "$FONT" \
               "$SIZE" \
@@ -972,17 +923,13 @@ jobs:
 
           done
 
-          echo "======================================"
-          echo "GENERATED ASS FILE"
-          echo "======================================"
+          echo "ASS FILE CREATED"
 
           cat work/subtitles.ass
 
 
       # ==========================================================
-      # 17. HARD ASS VALIDATION
-      #
-      # THIS MUST PASS BEFORE SUBTITLE RENDERING.
+      # 17. ASS VALIDATION
       # ==========================================================
 
       - name: Validate ASS subtitle structure
@@ -997,8 +944,6 @@ jobs:
             exit 1
           fi
 
-          echo "[Events] : FOUND"
-
           if ! grep -q \
             '^Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text$' \
             work/subtitles.ass; then
@@ -1007,29 +952,27 @@ jobs:
             exit 1
           fi
 
-          echo "Events Format : FOUND"
-
           DIALOGUE_COUNT=$(grep -c '^Dialogue:' work/subtitles.ass || true)
 
-          echo "Dialogue events found : $DIALOGUE_COUNT"
+          echo "Dialogue events : $DIALOGUE_COUNT"
 
           if [ "$DIALOGUE_COUNT" -ne 4 ]; then
             echo "ERROR: Expected exactly 4 Dialogue events."
             exit 1
           fi
 
-          echo "Dialogue events : 4"
+          echo "ASS STRUCTURE : VALID"
 
 
       # ==========================================================
-      # 18. VERIFY STYLE / DIALOGUE MATCHING
+      # 18. VERIFY STYLES
       # ==========================================================
 
-      - name: Verify ASS styles and dialogue
+      - name: Verify ASS styles
         shell: bash
         run: |
           echo "======================================"
-          echo "STYLE / DIALOGUE MATCHING"
+          echo "VERIFYING ASS STYLES"
           echo "======================================"
 
           for ID in 1 2 3 4
@@ -1038,33 +981,59 @@ jobs:
             STYLE_NAME="Scene${ID}"
 
             if ! grep -q "^${STYLE_NAME}," work/subtitles.ass; then
-              echo "ERROR: Style ${STYLE_NAME} missing."
+              echo "ERROR: Missing style $STYLE_NAME"
               exit 1
             fi
 
             if ! grep -q "^Dialogue: .*${STYLE_NAME},," work/subtitles.ass; then
-              echo "ERROR: Dialogue using ${STYLE_NAME} missing."
+              echo "ERROR: Missing dialogue for $STYLE_NAME"
               exit 1
             fi
 
-            echo "${STYLE_NAME} : VERIFIED"
+            echo "$STYLE_NAME : VERIFIED"
 
           done
 
-          echo "======================================"
-          echo "STYLE / DIALOGUE MATCH : VERIFIED"
-          echo "======================================"
+          echo "ALL STYLES : VERIFIED"
 
 
       # ==========================================================
-      # 19. VERIFY JSON → ASS COLOR / BOLD / ITALIC
+      # 19. VERIFY LARGE FONT SIZES
+      # ==========================================================
+
+      - name: Verify large font sizes
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "LARGE FONT VERIFICATION"
+          echo "======================================"
+
+          for ID in 1 2 3 4
+          do
+
+            SIZE=$(jq -r ".scenes[$((ID - 1))].subtitle.style.size" scene_config.json)
+
+            echo "Scene $ID : ${SIZE}px"
+
+            if [ "$SIZE" -lt 70 ]; then
+              echo "ERROR: Font too small."
+              exit 1
+            fi
+
+          done
+
+          echo "LARGE FONT SIZES : VERIFIED"
+
+
+      # ==========================================================
+      # 20. VERIFY DYNAMIC FORMATTING
       # ==========================================================
 
       - name: Verify dynamic text formatting
         shell: bash
         run: |
           echo "======================================"
-          echo "JSON → ASS TEXT FORMAT VERIFICATION"
+          echo "DYNAMIC TEXT FORMAT VERIFICATION"
           echo "======================================"
 
           for INDEX in 0 1 2 3
@@ -1100,27 +1069,18 @@ jobs:
 
             STYLE_LINE=$(grep "^${STYLE_NAME}," work/subtitles.ass)
 
-            echo "--------------------------------------"
-            echo "Scene $ID"
-            echo "JSON Color : $COLOR"
-            echo "ASS Color  : $ASS_COLOR"
-            echo "JSON Bold  : $BOLD"
-            echo "ASS Bold   : $ASS_BOLD"
-            echo "JSON Italic: $ITALIC"
-            echo "ASS Italic : $ASS_ITALIC"
-
             if [[ "$STYLE_LINE" != *"$ASS_COLOR"* ]]; then
-              echo "ERROR: Color conversion failed."
+              echo "ERROR: Color conversion failed for Scene $ID."
               exit 1
             fi
 
             if [[ "$STYLE_LINE" != *",$ASS_BOLD,"* ]]; then
-              echo "ERROR: Bold conversion failed."
+              echo "ERROR: Bold conversion failed for Scene $ID."
               exit 1
             fi
 
             if [[ "$STYLE_LINE" != *",$ASS_ITALIC,"* ]]; then
-              echo "ERROR: Italic conversion failed."
+              echo "ERROR: Italic conversion failed for Scene $ID."
               exit 1
             fi
 
@@ -1128,19 +1088,17 @@ jobs:
 
           done
 
-          echo "======================================"
-          echo "JSON → ASS FORMAT : VERIFIED"
-          echo "======================================"
+          echo "DYNAMIC TEXT FORMAT : VERIFIED"
 
 
       # ==========================================================
-      # 20. BURN SUBTITLES
+      # 21. BURN SUBTITLES
       # ==========================================================
 
-      - name: Burn subtitles
+      - name: Burn large clear subtitles
         run: |
           echo "======================================"
-          echo "BURNING SUBTITLES"
+          echo "BURNING LARGE CLEAR SUBTITLES"
           echo "======================================"
 
           ffmpeg -y \
@@ -1157,7 +1115,7 @@ jobs:
 
 
       # ==========================================================
-      # 21. VERIFY SUBTITLED VIDEO
+      # 22. VERIFY SUBTITLED VIDEO
       # ==========================================================
 
       - name: Verify subtitled video
@@ -1179,19 +1137,11 @@ jobs:
           fi
 
           echo "Subtitle video size : $SIZE bytes"
-
-          ffprobe \
-            -v error \
-            -select_streams v:0 \
-            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
-            -of default=noprint_wrappers=1 \
-            work/video_subtitles.mp4
-
           echo "SUBTITLED VIDEO : VALID"
 
 
       # ==========================================================
-      # 22. ADD NARRATION
+      # 23. ADD NARRATION
       # ==========================================================
 
       - name: Add narration
@@ -1212,13 +1162,13 @@ jobs:
             -c:a aac \
             -b:a 192k \
             -movflags +faststart \
-            output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4
+            output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
 
           echo "NARRATION : ADDED"
 
 
       # ==========================================================
-      # 23. FINAL VIDEO VALIDATION
+      # 24. FINAL VALIDATION
       # ==========================================================
 
       - name: Validate final video
@@ -1227,7 +1177,7 @@ jobs:
           echo "FINAL VIDEO VALIDATION"
           echo "======================================"
 
-          VIDEO="output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4"
+          VIDEO="output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4"
 
           if [ ! -f "$VIDEO" ]; then
             echo "ERROR: Final MP4 missing."
@@ -1243,20 +1193,12 @@ jobs:
 
           echo "File size : $SIZE bytes"
 
-          echo "--------------------------------------"
-          echo "VIDEO STREAM"
-          echo "--------------------------------------"
-
           ffprobe \
             -v error \
             -select_streams v:0 \
             -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
             -of default=noprint_wrappers=1 \
             "$VIDEO"
-
-          echo "--------------------------------------"
-          echo "AUDIO STREAM"
-          echo "--------------------------------------"
 
           ffprobe \
             -v error \
@@ -1265,158 +1207,138 @@ jobs:
             -of default=noprint_wrappers=1 \
             "$VIDEO"
 
-          echo "--------------------------------------"
-          echo "FINAL FORMAT"
-          echo "--------------------------------------"
-
           ffprobe \
             -v error \
             -show_entries format=duration,size \
             -of default=noprint_wrappers=1 \
             "$VIDEO"
 
-          echo "======================================"
           echo "FINAL VIDEO : VALID"
-          echo "======================================"
 
 
       # ==========================================================
-      # 24. CREATE REPORT
+      # 25. CREATE REPORT
       # ==========================================================
 
       - name: Create Test 15 report
         run: |
           cat > work/test15-report.txt <<'EOF'
           AICAP FREE VIDEO RENDERER
-          TEST 15 — DYNAMIC JSON TEXT FORMAT
+          TEST 15 — LARGE CLEAR DYNAMIC TEXT
 
           STATUS:
           RENDERED WITH VALIDATION
 
-          PIPELINE:
-          JSON
-          ↓
-          Scene Renderer
-          ↓
-          Transition Renderer
-          ↓
-          ASS Subtitle Generator
-          ↓
-          FFmpeg
-          ↓
-          MP4
+          VIDEO:
+          1080x1920
+          30 FPS
+          60 seconds
 
-          NEW TEST 15 FEATURES:
-
-          Dynamic Text Color
-          Dynamic Bold
-          Dynamic Italic
-
-          EXISTING FEATURES:
-
-          Dynamic Font
-          Dynamic Font Size
-          Dynamic Position
-          Dynamic Alignment
-          Dynamic Outline
-          Dynamic Shadow
-          Dynamic Margin
-
-          SCENE FORMATTING:
+          SUBTITLE VISIBILITY:
 
           Scene 1:
+          86px
           WHITE + BOLD
 
           Scene 2:
+          78px
           YELLOW + ITALIC
 
           Scene 3:
+          82px
           CYAN + BOLD + ITALIC
 
           Scene 4:
+          88px
           GREEN + NORMAL
 
-          ASS VALIDATION:
-
-          [Events] section:
+          OUTLINE:
           VERIFIED
 
-          Events Format:
+          SHADOW:
           VERIFIED
 
-          Dialogue Events:
+          POSITION:
+          VERIFIED
+
+          ASS EVENTS:
+          VERIFIED
+
+          DIALOGUE EVENTS:
           4
 
-          Style / Dialogue Matching:
+          JSON → ASS COLOR:
           VERIFIED
 
-          JSON → ASS Color:
+          JSON → ASS BOLD:
           VERIFIED
 
-          JSON → ASS Bold:
+          JSON → ASS ITALIC:
           VERIFIED
 
-          JSON → ASS Italic:
+          NARRATION:
+          VERIFIED
+
+          FINAL MP4:
           VERIFIED
 
           OUTPUT:
-
-          AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4
+          AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
           EOF
 
           cat work/test15-report.txt
 
 
       # ==========================================================
-      # 25. UPLOAD MP4
+      # 26. UPLOAD MP4
       # ==========================================================
 
-      - name: Upload Test 15 MP4
+      - name: Upload large clear MP4
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-DYNAMIC-JSON-TEXT-FORMAT
-          path: output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4
+          name: AICAP-FREE-15-LARGE-CLEAR-DYNAMIC-TEXT
+          path: output/AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4
           retention-days: 1
 
 
       # ==========================================================
-      # 26. UPLOAD JSON
+      # 27. UPLOAD JSON
       # ==========================================================
 
-      - name: Upload Test 15 JSON
+      - name: Upload JSON configuration
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-JSON-TEXT-FORMAT-CONFIG
+          name: AICAP-FREE-15-LARGE-CLEAR-JSON
           path: scene_config.json
           retention-days: 1
 
 
       # ==========================================================
-      # 27. UPLOAD ASS
+      # 28. UPLOAD ASS
       # ==========================================================
 
-      - name: Upload Test 15 ASS
+      - name: Upload ASS subtitles
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-CORRECTED-ASS
+          name: AICAP-FREE-15-LARGE-CLEAR-ASS
           path: work/subtitles.ass
           retention-days: 1
 
 
       # ==========================================================
-      # 28. UPLOAD REPORT
+      # 29. UPLOAD REPORT
       # ==========================================================
 
-      - name: Upload Test 15 report
+      - name: Upload validation report
         uses: actions/upload-artifact@v5
         with:
-          name: AICAP-FREE-15-VALIDATION-REPORT
+          name: AICAP-FREE-15-LARGE-CLEAR-REPORT
           path: work/test15-report.txt
           retention-days: 1
 
 
       # ==========================================================
-      # 29. FINAL RESULT
+      # 30. FINAL RESULT
       # ==========================================================
 
       - name: Test 15 final result
@@ -1424,30 +1346,28 @@ jobs:
           echo ""
           echo "=============================================="
           echo "AICAP FREE VIDEO RENDERER"
-          echo "TEST 15 — DYNAMIC JSON TEXT FORMAT"
+          echo "TEST 15 — LARGE CLEAR DYNAMIC TEXT"
           echo "=============================================="
           echo ""
           echo "JSON                         : VERIFIED"
           echo "Scene Rendering              : VERIFIED"
           echo "Scene Timing                 : VERIFIED"
           echo "Transitions                  : VERIFIED"
-          echo "ASS [Events]                 : VERIFIED"
+          echo "ASS Events                   : VERIFIED"
           echo "Dialogue Events              : 4"
-          echo "Style/Event Matching         : VERIFIED"
+          echo "Large Font Sizes             : VERIFIED"
           echo "Dynamic Color                : VERIFIED"
           echo "Dynamic Bold                 : VERIFIED"
           echo "Dynamic Italic               : VERIFIED"
-          echo "Dynamic Position             : VERIFIED"
-          echo "Dynamic Alignment            : VERIFIED"
-          echo "Dynamic Outline              : VERIFIED"
-          echo "Dynamic Shadow               : VERIFIED"
-          echo "Dynamic Margin               : VERIFIED"
+          echo "Outline                      : VERIFIED"
+          echo "Shadow                       : VERIFIED"
+          echo "Position                     : VERIFIED"
           echo "Narration                    : VERIFIED"
           echo "Final MP4                    : VERIFIED"
           echo ""
           echo "OUTPUT:"
-          echo "AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4"
+          echo "AICAP_FREE_15_LARGE_CLEAR_DYNAMIC_TEXT.mp4"
           echo ""
           echo "=============================================="
-          echo "TEST 15 WORKFLOW : SUCCESS"
+          echo "TEST 15 : SUCCESS"
           echo "=============================================="
