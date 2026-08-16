@@ -1,0 +1,1271 @@
+name: AICAP FREE RENDER — 13 — DYNAMIC JSON SUBTITLES
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-13:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL FFMPEG + JQ
+      # ==========================================================
+
+      - name: Install FFmpeg and jq
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "13 — DYNAMIC JSON SUBTITLES"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq
+
+          echo "FFmpeg installed."
+          echo "jq installed."
+
+
+      # ==========================================================
+      # 03. VERIFY TOOLS
+      # ==========================================================
+
+      - name: Verify rendering tools
+        run: |
+          echo "======================================"
+          echo "TOOL VERIFICATION"
+          echo "======================================"
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+            echo "Path   : $(which ffmpeg)"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq     : AVAILABLE"
+            echo "Path   : $(which jq)"
+          else
+            echo "jq     : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "TOOLS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 04. DEFINE REAL AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "REAL AICAP ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Scene 04:"
+          echo "Scene 01 image reused for renderer testing"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. CREATE TEST 13 JSON
+      #
+      # NEW CAPABILITY:
+      #
+      # Each scene now contains its ACTUAL subtitle text.
+      #
+      # The renderer will read the text directly from JSON.
+      # ==========================================================
+
+      - name: Create dynamic subtitle JSON
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 13 JSON"
+          echo "======================================"
+
+          cat > scene_config.json <<'EOF'
+          {
+            "project": {
+              "name": "AICAP_TEST_13_DYNAMIC_JSON_SUBTITLES",
+              "resolution": {
+                "width": 1080,
+                "height": 1920
+              },
+              "fps": 30,
+              "total_duration": 60
+            },
+
+            "transition": {
+              "type": "fade",
+              "duration": 1
+            },
+
+            "narration": {
+              "enabled": true,
+              "source": "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3",
+              "mode": "timeline_sync",
+
+              "segments": [
+                {
+                  "id": 1,
+                  "start": 0,
+                  "duration": 10,
+                  "end": 10
+                },
+
+                {
+                  "id": 2,
+                  "start": 10,
+                  "duration": 15,
+                  "end": 25
+                },
+
+                {
+                  "id": 3,
+                  "start": 25,
+                  "duration": 15,
+                  "end": 40
+                },
+
+                {
+                  "id": 4,
+                  "start": 40,
+                  "duration": 20,
+                  "end": 60
+                }
+              ]
+            },
+
+            "scenes": [
+              {
+                "id": 1,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 0,
+                "duration": 10,
+                "end": 10,
+                "motion": "zoom_in",
+                "subtitle": {
+                  "enabled": true,
+                  "text": "Artificial intelligence is changing the world."
+                }
+              },
+
+              {
+                "id": 2,
+                "image": "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg",
+                "start": 10,
+                "duration": 15,
+                "end": 25,
+                "motion": "zoom_out",
+                "subtitle": {
+                  "enabled": true,
+                  "text": "It helps people work faster and smarter."
+                }
+              },
+
+              {
+                "id": 3,
+                "image": "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg",
+                "start": 25,
+                "duration": 15,
+                "end": 40,
+                "motion": "pan_left",
+                "subtitle": {
+                  "enabled": true,
+                  "text": "Creative tools can turn ideas into powerful stories."
+                }
+              },
+
+              {
+                "id": 4,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 40,
+                "duration": 20,
+                "end": 60,
+                "motion": "pan_right",
+                "subtitle": {
+                  "enabled": true,
+                  "text": "AICAP can bring the complete story together."
+                }
+              }
+            ]
+          }
+          EOF
+
+          echo "--------------------------------------"
+          echo "TEST 13 JSON"
+          echo "--------------------------------------"
+
+          cat scene_config.json
+
+          echo "======================================"
+          echo "TEST 13 JSON CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. VALIDATE JSON SYNTAX
+      # ==========================================================
+
+      - name: Validate JSON syntax
+        run: |
+          echo "======================================"
+          echo "JSON SYNTAX VALIDATION"
+          echo "======================================"
+
+          jq empty scene_config.json
+
+          echo "JSON syntax : VALID"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 07. READ GLOBAL CONFIGURATION
+      # ==========================================================
+
+      - name: Read global configuration
+        run: |
+          WIDTH=$(jq -r '.project.resolution.width' scene_config.json)
+          HEIGHT=$(jq -r '.project.resolution.height' scene_config.json)
+          FPS=$(jq -r '.project.fps' scene_config.json)
+          TARGET=$(jq -r '.project.total_duration' scene_config.json)
+          TRANSITION=$(jq -r '.transition.duration' scene_config.json)
+
+          echo "WIDTH=$WIDTH" >> "$GITHUB_ENV"
+          echo "HEIGHT=$HEIGHT" >> "$GITHUB_ENV"
+          echo "FPS=$FPS" >> "$GITHUB_ENV"
+          echo "TARGET_DURATION=$TARGET" >> "$GITHUB_ENV"
+          echo "TRANSITION_DURATION=$TRANSITION" >> "$GITHUB_ENV"
+
+          echo "======================================"
+          echo "GLOBAL CONFIGURATION"
+          echo "======================================"
+
+          echo "Resolution : ${WIDTH}x${HEIGHT}"
+          echo "FPS        : $FPS"
+          echo "Target     : $TARGET seconds"
+          echo "Transition : $TRANSITION seconds"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 08. VALIDATE SCENE TIMELINE
+      # ==========================================================
+
+      - name: Validate scene timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SCENE TIMELINE VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+          TARGET_DURATION=$(jq '.project.total_duration' scene_config.json)
+
+          EXPECTED_START=0
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            echo "Scene $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+
+            if [ "$START" -ne "$EXPECTED_START" ]; then
+              echo "ERROR: Scene $ID start is incorrect."
+              exit 1
+            fi
+
+            CALCULATED_END=$((START + DURATION))
+
+            if [ "$END" -ne "$CALCULATED_END" ]; then
+              echo "ERROR: Scene $ID end is incorrect."
+              exit 1
+            fi
+
+            EXPECTED_START="$END"
+
+            echo "--------------------------------------"
+
+          done
+
+          if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
+            echo "ERROR: Scene timeline does not end at project duration."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "SCENE TIMELINE : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 09. VALIDATE NARRATION TIMELINE
+      # ==========================================================
+
+      - name: Validate narration timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "NARRATION TIMELINE VALIDATION"
+          echo "======================================"
+
+          SEGMENT_COUNT=$(jq '.narration.segments | length' scene_config.json)
+          TARGET_DURATION=$(jq '.project.total_duration' scene_config.json)
+
+          EXPECTED_START=0
+
+          for INDEX in $(seq 0 $((SEGMENT_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".narration.segments[$INDEX].id" scene_config.json)
+            START=$(jq -r ".narration.segments[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".narration.segments[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".narration.segments[$INDEX].end" scene_config.json)
+
+            echo "Narration Segment $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+
+            if [ "$START" -ne "$EXPECTED_START" ]; then
+              echo "ERROR: Narration timeline is not continuous."
+              exit 1
+            fi
+
+            CALCULATED_END=$((START + DURATION))
+
+            if [ "$END" -ne "$CALCULATED_END" ]; then
+              echo "ERROR: Narration segment end is incorrect."
+              exit 1
+            fi
+
+            EXPECTED_START="$END"
+
+          done
+
+          if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
+            echo "ERROR: Narration timeline does not end at project duration."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "NARRATION TIMELINE : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 10. VERIFY SCENE ↔ NARRATION SYNCHRONIZATION
+      # ==========================================================
+
+      - name: Verify scene narration synchronization
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SCENE ↔ NARRATION SYNCHRONIZATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+          SEGMENT_COUNT=$(jq '.narration.segments | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -ne "$SEGMENT_COUNT" ]; then
+            echo "ERROR: Scene count and narration count differ."
+            exit 1
+          fi
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            SCENE_START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            SCENE_END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            NARR_START=$(jq -r ".narration.segments[$INDEX].start" scene_config.json)
+            NARR_END=$(jq -r ".narration.segments[$INDEX].end" scene_config.json)
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            echo "Scene $ID"
+            echo "Scene     : $SCENE_START → $SCENE_END"
+            echo "Narration : $NARR_START → $NARR_END"
+
+            if [ "$SCENE_START" -ne "$NARR_START" ]; then
+              echo "ERROR: Scene/narration start mismatch."
+              exit 1
+            fi
+
+            if [ "$SCENE_END" -ne "$NARR_END" ]; then
+              echo "ERROR: Scene/narration end mismatch."
+              exit 1
+            fi
+
+            echo "Synchronization : PASS"
+
+          done
+
+          echo "======================================"
+          echo "SCENE ↔ NARRATION SYNC : PASSED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 11. VALIDATE SUBTITLE CONTENT
+      #
+      # THIS IS THE CORE OF TEST 13.
+      #
+      # Every enabled subtitle must have non-empty text.
+      # ==========================================================
+
+      - name: Validate JSON subtitle content
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "JSON SUBTITLE CONTENT VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            echo "Scene $ID"
+            echo "Enabled : $ENABLED"
+            echo "Text    : $TEXT"
+
+            if [ "$ENABLED" = "true" ]; then
+
+              if [ -z "$TEXT" ] || [ "$TEXT" = "null" ]; then
+                echo "ERROR: Scene $ID has empty subtitle text."
+                exit 1
+              fi
+
+            fi
+
+            echo "Subtitle content : VALID"
+            echo "--------------------------------------"
+
+          done
+
+          echo "======================================"
+          echo "ALL JSON SUBTITLE CONTENT : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 12. VALIDATE ASSETS
+      # ==========================================================
+
+      - name: Validate AICAP assets
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "ASSET VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+
+            echo "Checking image:"
+            echo "$IMAGE"
+
+            if [ ! -f "$IMAGE" ]; then
+              echo "ERROR: Missing image:"
+              echo "$IMAGE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$IMAGE")
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Image is empty."
+              exit 1
+            fi
+
+          done
+
+          AUDIO=$(jq -r '.narration.source' scene_config.json)
+
+          echo "Checking narration:"
+          echo "$AUDIO"
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: Narration file missing."
+            exit 1
+          fi
+
+          AUDIO_SIZE=$(stat -c%s "$AUDIO")
+
+          if [ "$AUDIO_SIZE" -le 0 ]; then
+            echo "ERROR: Narration file is empty."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "ALL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 13. INSPECT SOURCE NARRATION
+      # ==========================================================
+
+      - name: Inspect narration source
+        run: |
+          echo "======================================"
+          echo "NARRATION SOURCE INSPECTION"
+          echo "======================================"
+
+          AUDIO=$(jq -r '.narration.source' scene_config.json)
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$AUDIO"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$AUDIO"
+
+          echo "======================================"
+          echo "NARRATION SOURCE : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 14. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+
+      # ==========================================================
+      # 15. RENDER SCENES
+      # ==========================================================
+
+      - name: Render timeline scenes
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "TIMELINE SCENE RENDERING"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            if [ "$INDEX" -lt $((SCENE_COUNT - 1)) ]; then
+              SOURCE_DURATION=$(awk \
+                "BEGIN {print $DURATION + $TRANSITION_DURATION}"
+              )
+            else
+              SOURCE_DURATION="$DURATION"
+            fi
+
+            FRAME_COUNT=$(awk \
+              "BEGIN {printf \"%d\", $SOURCE_DURATION * $FPS - 1}"
+            )
+
+            OUTPUT="work/scene_${ID}.mp4"
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Duration : $DURATION"
+            echo "Motion   : $MOTION"
+            echo "Output   : $OUTPUT"
+            echo "--------------------------------------"
+
+            case "$MOTION" in
+
+              zoom_in)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.0+0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  x='(iw-iw/zoom)*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              zoom_out)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.15-0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  x='(iw-iw/zoom)/2':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              pan_left)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.12':\
+                  x='(iw-iw/zoom)*(1-on/$FRAME_COUNT)':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              pan_right)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.12':\
+                  x='(iw-iw/zoom)*(on/$FRAME_COUNT)':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              static)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2" \
+                  -r "$FPS" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -an \
+                  "$OUTPUT"
+                ;;
+
+              *)
+
+                echo "ERROR: Unsupported motion type:"
+                echo "$MOTION"
+                exit 1
+                ;;
+
+            esac
+
+            if [ ! -f "$OUTPUT" ]; then
+              echo "ERROR: Scene $ID was not rendered."
+              exit 1
+            fi
+
+            echo "Scene $ID rendered successfully."
+
+          done
+
+          echo "======================================"
+          echo "ALL SCENES RENDERED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 16. BUILD TIMELINE TRANSITIONS
+      # ==========================================================
+
+      - name: Build timeline transitions
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "BUILDING TIMELINE TRANSITIONS"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -eq 1 ]; then
+
+            cp work/scene_1.mp4 work/video_core.mp4
+
+          else
+
+            INPUT_ARGS=()
+
+            for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+            do
+
+              ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+              INPUT_ARGS+=(
+                -i
+                "work/scene_${ID}.mp4"
+              )
+
+            done
+
+            FIRST_DURATION=$(jq -r '.scenes[0].duration' scene_config.json)
+
+            FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${FIRST_DURATION}[v1]"
+
+            if [ "$SCENE_COUNT" -gt 2 ]; then
+
+              for INDEX in $(seq 2 $((SCENE_COUNT - 1)))
+              do
+
+                CURRENT_START=$(jq \
+                  -r ".scenes[$INDEX].start" \
+                  scene_config.json
+                )
+
+                PREVIOUS_LABEL="v$((INDEX - 1))"
+
+                FILTER="${FILTER};[${PREVIOUS_LABEL}][${INDEX}:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${CURRENT_START}[v${INDEX}]"
+
+              done
+
+            fi
+
+            FINAL_LABEL="v$((SCENE_COUNT - 1))"
+
+            ffmpeg \
+              -y \
+              "${INPUT_ARGS[@]}" \
+              -filter_complex "$FILTER" \
+              -map "[${FINAL_LABEL}]" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r "$FPS" \
+              work/video_core.mp4
+
+          fi
+
+          echo "======================================"
+          echo "TRANSITIONS COMPLETED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 17. VERIFY CORE VIDEO
+      # ==========================================================
+
+      - name: Verify core video
+        run: |
+          echo "======================================"
+          echo "CORE VIDEO VERIFICATION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          echo "======================================"
+          echo "CORE VIDEO : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 18. GENERATE SRT DIRECTLY FROM JSON
+      #
+      # THIS IS THE MAIN TEST.
+      #
+      # Subtitle text comes from:
+      #
+      # .scenes[].subtitle.text
+      #
+      # NOT from hard-coded subtitle text.
+      # ==========================================================
+
+      - name: Generate subtitles from JSON
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "GENERATING SUBTITLES FROM JSON"
+          echo "======================================"
+
+          : > work/subtitles.srt
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            NUMBER=$((INDEX + 1))
+
+            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            if [ "$ENABLED" != "true" ]; then
+              echo "Scene $ID subtitle disabled."
+              continue
+            fi
+
+            START_H=$((START / 3600))
+            START_M=$(((START % 3600) / 60))
+            START_S=$((START % 60))
+
+            END_H=$((END / 3600))
+            END_M=$(((END % 3600) / 60))
+            END_S=$((END % 60))
+
+            printf "%d\n" "$NUMBER" >> work/subtitles.srt
+
+            printf "%02d:%02d:%02d,000 --> %02d:%02d:%02d,000\n" \
+              "$START_H" \
+              "$START_M" \
+              "$START_S" \
+              "$END_H" \
+              "$END_M" \
+              "$END_S" \
+              >> work/subtitles.srt
+
+            printf "%s\n\n" "$TEXT" >> work/subtitles.srt
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Time : $START → $END"
+            echo "Text : $TEXT"
+
+          done
+
+          echo "======================================"
+          echo "GENERATED SRT"
+          echo "======================================"
+
+          cat work/subtitles.srt
+
+          echo "======================================"
+          echo "SUBTITLES GENERATED FROM JSON"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 19. VERIFY SRT CONTENT
+      # ==========================================================
+
+      - name: Verify generated subtitle content
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SRT CONTENT VERIFICATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '[.scenes[] | select(.subtitle.enabled == true)] | length' scene_config.json)
+
+          SRT_COUNT=$(grep -c "^[0-9][0-9]*$" work/subtitles.srt || true)
+
+          echo "JSON subtitle count : $SCENE_COUNT"
+          echo "SRT subtitle count  : $SRT_COUNT"
+
+          if [ "$SCENE_COUNT" -ne "$SRT_COUNT" ]; then
+            echo "ERROR: JSON and SRT subtitle counts differ."
+            exit 1
+          fi
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            if ! grep -F -- "$TEXT" work/subtitles.srt >/dev/null 2>&1; then
+              echo "ERROR: JSON subtitle text not found in SRT:"
+              echo "$TEXT"
+              exit 1
+            fi
+
+            echo "Verified:"
+            echo "$TEXT"
+
+          done
+
+          echo "======================================"
+          echo "SRT CONTENT : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 20. BURN JSON-GENERATED SUBTITLES
+      # ==========================================================
+
+      - name: Burn JSON-generated subtitles
+        run: |
+          echo "======================================"
+          echo "BURNING JSON-GENERATED SUBTITLES"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/video_core.mp4 \
+            -vf "subtitles=work/subtitles.srt:force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=150'" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r "$FPS" \
+            -an \
+            work/video_subtitles.mp4
+
+          echo "JSON-generated subtitles burned into video."
+
+
+      # ==========================================================
+      # 21. CREATE SUBTITLE REPORT
+      # ==========================================================
+
+      - name: Create subtitle report
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "CREATING SUBTITLE REPORT"
+          echo "======================================"
+
+          cat > work/subtitle_report.txt <<EOF
+          AICAP TEST 13 — DYNAMIC JSON SUBTITLES
+
+          Subtitle source:
+          scene_config.json
+
+          Subtitle generation mode:
+          JSON → SRT → FFmpeg
+
+          Project duration:
+          $(jq -r '.project.total_duration' scene_config.json) seconds
+
+          Subtitle entries:
+
+          $(jq -r '
+            .scenes[]
+            | select(.subtitle.enabled == true)
+            | "Scene \(.id) | \(.start)s–\(.end)s | \(.subtitle.text)"
+          ' scene_config.json)
+
+          Result:
+          Subtitle content was generated directly from JSON.
+          EOF
+
+          cat work/subtitle_report.txt
+
+
+      # ==========================================================
+      # 22. ADD NARRATION
+      # ==========================================================
+
+      - name: Add narration
+        run: |
+          echo "======================================"
+          echo "ADDING NARRATION"
+          echo "======================================"
+
+          AUDIO=$(jq -r '.narration.source' scene_config.json)
+
+          ffmpeg \
+            -y \
+            -i work/video_subtitles.mp4 \
+            -i "$AUDIO" \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t "$TARGET_DURATION" \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_13_DYNAMIC_JSON_SUBTITLES.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 23. FINAL VIDEO VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 13 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "13 — DYNAMIC JSON SUBTITLES"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_13_DYNAMIC_JSON_SUBTITLES.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Final video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels,duration \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+
+          echo "Configuration     : JSON"
+          echo "Scene Count       : 4"
+
+          echo "Scene 01          : 0–10 sec"
+          echo "Scene 02          : 10–25 sec"
+          echo "Scene 03          : 25–40 sec"
+          echo "Scene 04          : 40–60 sec"
+
+          echo "Subtitle Source   : JSON"
+          echo "Subtitle Content  : Dynamic"
+          echo "Subtitle Timing   : Scene Timeline"
+
+          echo "Narration         : Timeline Sync"
+          echo "Total Duration    : 60 sec"
+
+          echo "Resolution        : 1080x1920"
+          echo "FPS               : 30"
+          echo "Video Codec       : H.264"
+          echo "Audio Codec       : AAC"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 24. UPLOAD MP4
+      # ==========================================================
+
+      - name: Upload Test 13 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-13-DYNAMIC-JSON-SUBTITLES
+          path: output/AICAP_FREE_13_DYNAMIC_JSON_SUBTITLES.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 25. UPLOAD JSON
+      # ==========================================================
+
+      - name: Upload Test 13 JSON
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-13-JSON-SUBTITLE-CONFIG
+          path: scene_config.json
+          retention-days: 1
+
+
+      # ==========================================================
+      # 26. UPLOAD SRT
+      # ==========================================================
+
+      - name: Upload Test 13 SRT
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-13-GENERATED-SRT
+          path: work/subtitles.srt
+          retention-days: 1
+
+
+      # ==========================================================
+      # 27. UPLOAD SUBTITLE REPORT
+      # ==========================================================
+
+      - name: Upload Test 13 subtitle report
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-13-SUBTITLE-REPORT
+          path: work/subtitle_report.txt
+          retention-days: 1
+
+
+      # ==========================================================
+      # 28. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 13 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "13 — DYNAMIC JSON SUBTITLES"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "CONFIGURATION     : JSON"
+
+          echo "SCENE COUNT       : 4"
+
+          echo "SCENE 01          : 0–10 sec"
+          echo "SCENE 02          : 10–25 sec"
+          echo "SCENE 03          : 25–40 sec"
+          echo "SCENE 04          : 40–60 sec"
+
+          echo "SUBTITLE SOURCE   : JSON"
+          echo "SUBTITLE CONTENT  : DYNAMIC"
+          echo "SUBTITLE TIMING   : SCENE TIMELINE"
+
+          echo "NARRATION         : TIMELINE SYNC"
+          echo "TOTAL VIDEO       : 60 sec"
+
+          echo "RESOLUTION        : 1080x1920"
+          echo "FPS               : 30"
+          echo "VIDEO CODEC       : H.264"
+          echo "AUDIO CODEC       : AAC"
+
+          echo "OUTPUT            : AICAP_FREE_13_DYNAMIC_JSON_SUBTITLES.mp4"
+
+          echo "VIDEO ARTIFACT    : AICAP-FREE-13-DYNAMIC-JSON-SUBTITLES"
+          echo "JSON ARTIFACT     : AICAP-FREE-13-JSON-SUBTITLE-CONFIG"
+          echo "SRT ARTIFACT      : AICAP-FREE-13-GENERATED-SRT"
+          echo "REPORT ARTIFACT   : AICAP-FREE-13-SUBTITLE-REPORT"
+
+          echo "======================================"
+          echo "TEST 13 STATUS : PASSED"
+          echo "======================================"
