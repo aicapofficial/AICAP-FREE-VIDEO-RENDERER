@@ -887,19 +887,20 @@ jobs:
           echo "ASS GENERATION : COMPLETE"
 
 
-      # ==========================================================
-      # 17. VALIDATE ASS DIRECTLY WITH PYTHON
+          # ==========================================================
+      # 17. ROBUST ASS VALIDATION
       # ==========================================================
 
       - name: Validate generated ASS
         shell: bash
         run: |
           echo "======================================"
-          echo "ASS VALIDATION"
+          echo "ROBUST ASS VALIDATION"
           echo "======================================"
 
           python3 <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("work/subtitles.ass")
 
@@ -917,43 +918,186 @@ jobs:
           print(f"Dialogue events : {len(dialogue)}")
 
           if len(dialogue) != 4:
-              print("ERROR: Expected 4 Dialogue events.")
+              print("ERROR: Expected exactly 4 Dialogue events.")
               raise SystemExit(1)
 
           expected = [
-              (r"\fs120", r"\c&H00FFFFFF&", r"\b1", r"\i0"),
-              (r"\fs112", r"\c&H0000FFFF&", r"\b0", r"\i1"),
-              (r"\fs115", r"\c&H00FFFF00&", r"\b1", r"\i1"),
-              (r"\fs120", r"\c&H0000FF00&", r"\b0", r"\i0")
+              {
+                  "size": "120",
+                  "color": "FFFFFF",
+                  "bold": "1",
+                  "italic": "0"
+              },
+              {
+                  "size": "112",
+                  "color": "FFFF00",
+                  "bold": "0",
+                  "italic": "1"
+              },
+              {
+                  "size": "115",
+                  "color": "00FFFF",
+                  "bold": "1",
+                  "italic": "1"
+              },
+              {
+                  "size": "120",
+                  "color": "00FF00",
+                  "bold": "0",
+                  "italic": "0"
+              }
           ]
 
-          for index, values in enumerate(expected, start=1):
-
-              line = dialogue[index - 1]
+          for number, (line, wanted) in enumerate(
+              zip(dialogue, expected), start=1
+          ):
 
               print("")
-              print(f"Scene {index} verification")
+              print("--------------------------------------")
+              print(f"Scene {number}")
+              print("--------------------------------------")
 
-              for value in values:
+              print("Dialogue:")
+              print(line)
 
-                  if value not in line:
-                      print(f"ERROR: Missing {value}")
-                      print("ACTUAL DIALOGUE:")
-                      print(line)
-                      raise SystemExit(1)
+              # --------------------------------------------------
+              # FONT SIZE
+              # --------------------------------------------------
 
-                  print(f"{value} : VERIFIED")
+              size_match = re.search(r"\\fs(\d+)", line)
 
-              if r"\bord5" not in line:
-                  print("ERROR: Outline missing.")
+              if not size_match:
+                  print("ERROR: Font size command missing.")
                   raise SystemExit(1)
 
-              if r"\shad3" not in line:
-                  print("ERROR: Shadow missing.")
+              actual_size = size_match.group(1)
+
+              if actual_size != wanted["size"]:
+                  print(
+                      f"ERROR: Expected font size "
+                      f"{wanted['size']}, found {actual_size}."
+                  )
                   raise SystemExit(1)
 
-              print(r"\bord5 : VERIFIED")
-              print(r"\shad3 : VERIFIED")
+              print(f"Font size : {actual_size}px VERIFIED")
+
+
+              # --------------------------------------------------
+              # COLOR
+              # --------------------------------------------------
+
+              color_match = re.search(
+                  r"\\c&H([0-9A-Fa-f]{8})",
+                  line
+              )
+
+              if not color_match:
+                  print("ERROR: ASS colour command missing.")
+                  raise SystemExit(1)
+
+              actual_ass_color = color_match.group(1).upper()
+
+              # ASS stores colours as AABBGGRR.
+              # Convert expected RGB to ASS BGR.
+              rgb = wanted["color"].upper()
+
+              expected_ass_color = (
+                  "00"
+                  + rgb[4:6]
+                  + rgb[2:4]
+                  + rgb[0:2]
+              )
+
+              if actual_ass_color != expected_ass_color:
+                  print(
+                      f"ERROR: Expected ASS colour "
+                      f"{expected_ass_color}, "
+                      f"found {actual_ass_color}."
+                  )
+                  raise SystemExit(1)
+
+              print(
+                  f"Colour    : #{rgb} "
+                  f"(ASS {actual_ass_color}) VERIFIED"
+              )
+
+
+              # --------------------------------------------------
+              # BOLD
+              # --------------------------------------------------
+
+              bold_match = re.search(r"\\b([01])", line)
+
+              if not bold_match:
+                  print("ERROR: Bold command missing.")
+                  raise SystemExit(1)
+
+              actual_bold = bold_match.group(1)
+
+              if actual_bold != wanted["bold"]:
+                  print(
+                      f"ERROR: Expected bold "
+                      f"{wanted['bold']}, found {actual_bold}."
+                  )
+                  raise SystemExit(1)
+
+              print(f"Bold      : {actual_bold} VERIFIED")
+
+
+              # --------------------------------------------------
+              # ITALIC
+              # --------------------------------------------------
+
+              italic_match = re.search(r"\\i([01])", line)
+
+              if not italic_match:
+                  print("ERROR: Italic command missing.")
+                  raise SystemExit(1)
+
+              actual_italic = italic_match.group(1)
+
+              if actual_italic != wanted["italic"]:
+                  print(
+                      f"ERROR: Expected italic "
+                      f"{wanted['italic']}, found {actual_italic}."
+                  )
+                  raise SystemExit(1)
+
+              print(f"Italic    : {actual_italic} VERIFIED")
+
+
+              # --------------------------------------------------
+              # OUTLINE
+              # --------------------------------------------------
+
+              if not re.search(r"\\bord5(?:\D|$)", line):
+                  print("ERROR: Outline command missing.")
+                  raise SystemExit(1)
+
+              print("Outline   : 5 VERIFIED")
+
+
+              # --------------------------------------------------
+              # SHADOW
+              # --------------------------------------------------
+
+              if not re.search(r"\\shad3(?:\D|$)", line):
+                  print("ERROR: Shadow command missing.")
+                  raise SystemExit(1)
+
+              print("Shadow    : 3 VERIFIED")
+
+
+              # --------------------------------------------------
+              # POSITION
+              # --------------------------------------------------
+
+              if not re.search(r"\\pos\(540,1510\)|\\pos\(540,1580\)", line):
+                  print("ERROR: Position command missing.")
+                  raise SystemExit(1)
+
+              print("Position  : VERIFIED")
+
 
           print("")
           print("======================================")
@@ -961,7 +1105,7 @@ jobs:
           print("======================================")
           PY
 
-
+          
       # ==========================================================
       # 18. BURN SUBTITLES
       # ==========================================================
