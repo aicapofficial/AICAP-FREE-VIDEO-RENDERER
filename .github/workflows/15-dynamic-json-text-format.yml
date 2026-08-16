@@ -1,0 +1,1612 @@
+name: AICAP FREE RENDER — 15 — DYNAMIC JSON TEXT FORMAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render-test-15:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 01. CHECKOUT
+      # ==========================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+
+      # ==========================================================
+      # 02. INSTALL TOOLS
+      # ==========================================================
+
+      - name: Install FFmpeg and jq
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "15 — DYNAMIC JSON TEXT FORMAT"
+          echo "======================================"
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq
+
+          echo "FFmpeg installed."
+          echo "jq installed."
+
+
+      # ==========================================================
+      # 03. VERIFY TOOLS
+      # ==========================================================
+
+      - name: Verify rendering tools
+        run: |
+          echo "======================================"
+          echo "TOOL VERIFICATION"
+          echo "======================================"
+
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg : AVAILABLE"
+          else
+            echo "FFmpeg : NOT AVAILABLE"
+            exit 1
+          fi
+
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq     : AVAILABLE"
+          else
+            echo "jq     : NOT AVAILABLE"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "TOOLS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 04. DEFINE AICAP ASSETS
+      # ==========================================================
+
+      - name: Define AICAP assets
+        run: |
+          echo "======================================"
+          echo "AICAP ASSETS"
+          echo "======================================"
+
+          echo "Scene 01:"
+          echo "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg"
+
+          echo "Scene 02:"
+          echo "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg"
+
+          echo "Scene 03:"
+          echo "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg"
+
+          echo "Scene 04:"
+          echo "Scene 01 image reused"
+
+          echo "Narration:"
+          echo "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3"
+
+
+      # ==========================================================
+      # 05. CREATE TEST 15 JSON
+      #
+      # NEW CAPABILITIES:
+      #
+      # color
+      # bold
+      # italic
+      #
+      # Existing Test 14 properties remain:
+      #
+      # font
+      # size
+      # position
+      # alignment
+      # outline
+      # shadow
+      # margin
+      # ==========================================================
+
+      - name: Create dynamic text format JSON
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 15 JSON"
+          echo "======================================"
+
+          cat > scene_config.json <<'EOF'
+          {
+            "project": {
+              "name": "AICAP_TEST_15_DYNAMIC_JSON_TEXT_FORMAT",
+              "resolution": {
+                "width": 1080,
+                "height": 1920
+              },
+              "fps": 30,
+              "total_duration": 60
+            },
+
+            "transition": {
+              "type": "fade",
+              "duration": 1
+            },
+
+            "narration": {
+              "enabled": true,
+              "source": "AI_in_60_Seconds_DEFAULT_20260811_190008.mp3",
+              "mode": "timeline_sync",
+
+              "segments": [
+                {
+                  "id": 1,
+                  "start": 0,
+                  "duration": 10,
+                  "end": 10
+                },
+
+                {
+                  "id": 2,
+                  "start": 10,
+                  "duration": 15,
+                  "end": 25
+                },
+
+                {
+                  "id": 3,
+                  "start": 25,
+                  "duration": 15,
+                  "end": 40
+                },
+
+                {
+                  "id": 4,
+                  "start": 40,
+                  "duration": 20,
+                  "end": 60
+                }
+              ]
+            },
+
+            "scenes": [
+              {
+                "id": 1,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 0,
+                "duration": 10,
+                "end": 10,
+                "motion": "zoom_in",
+
+                "subtitle": {
+                  "enabled": true,
+                  "text": "Artificial intelligence is changing the world.",
+
+                  "style": {
+                    "font": "Arial",
+                    "size": 54,
+
+                    "color": "#FFFFFF",
+
+                    "bold": true,
+                    "italic": false,
+
+                    "alignment": 2,
+
+                    "position": {
+                      "x": 540,
+                      "y": 1650
+                    },
+
+                    "outline": 3,
+                    "shadow": 1,
+                    "margin": 80
+                  }
+                }
+              },
+
+              {
+                "id": 2,
+                "image": "AICAP_SECTION10_SCENE02_CLOUDFLARE_20260814_122220.jpg",
+                "start": 10,
+                "duration": 15,
+                "end": 25,
+                "motion": "zoom_out",
+
+                "subtitle": {
+                  "enabled": true,
+                  "text": "It helps people work faster and smarter.",
+
+                  "style": {
+                    "font": "Arial",
+                    "size": 46,
+
+                    "color": "#FFFF00",
+
+                    "bold": false,
+                    "italic": true,
+
+                    "alignment": 2,
+
+                    "position": {
+                      "x": 540,
+                      "y": 1600
+                    },
+
+                    "outline": 4,
+                    "shadow": 2,
+                    "margin": 70
+                  }
+                }
+              },
+
+              {
+                "id": 3,
+                "image": "AICAP_SECTION10_SCENE03_CLOUDFLARE_20260814_122224.jpg",
+                "start": 25,
+                "duration": 15,
+                "end": 40,
+                "motion": "pan_left",
+
+                "subtitle": {
+                  "enabled": true,
+                  "text": "Creative tools can turn ideas into powerful stories.",
+
+                  "style": {
+                    "font": "Arial",
+                    "size": 42,
+
+                    "color": "#00FFFF",
+
+                    "bold": true,
+                    "italic": true,
+
+                    "alignment": 2,
+
+                    "position": {
+                      "x": 540,
+                      "y": 1550
+                    },
+
+                    "outline": 3,
+                    "shadow": 1,
+                    "margin": 60
+                  }
+                }
+              },
+
+              {
+                "id": 4,
+                "image": "AICAP_SECTION10_SCENE01_CLOUDFLARE_20260814_122215.jpg",
+                "start": 40,
+                "duration": 20,
+                "end": 60,
+                "motion": "pan_right",
+
+                "subtitle": {
+                  "enabled": true,
+                  "text": "AICAP can bring the complete story together.",
+
+                  "style": {
+                    "font": "Arial",
+                    "size": 50,
+
+                    "color": "#00FF00",
+
+                    "bold": false,
+                    "italic": false,
+
+                    "alignment": 2,
+
+                    "position": {
+                      "x": 540,
+                      "y": 1680
+                    },
+
+                    "outline": 5,
+                    "shadow": 2,
+                    "margin": 90
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+
+          echo "--------------------------------------"
+          echo "TEST 15 JSON"
+          echo "--------------------------------------"
+
+          cat scene_config.json
+
+          echo "======================================"
+          echo "TEST 15 JSON CREATED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 06. VALIDATE JSON
+      # ==========================================================
+
+      - name: Validate JSON syntax
+        run: |
+          echo "======================================"
+          echo "JSON VALIDATION"
+          echo "======================================"
+
+          jq empty scene_config.json
+
+          echo "JSON syntax : VALID"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 07. READ GLOBAL CONFIGURATION
+      # ==========================================================
+
+      - name: Read global configuration
+        run: |
+          WIDTH=$(jq -r '.project.resolution.width' scene_config.json)
+          HEIGHT=$(jq -r '.project.resolution.height' scene_config.json)
+          FPS=$(jq -r '.project.fps' scene_config.json)
+          TARGET=$(jq -r '.project.total_duration' scene_config.json)
+          TRANSITION=$(jq -r '.transition.duration' scene_config.json)
+
+          echo "WIDTH=$WIDTH" >> "$GITHUB_ENV"
+          echo "HEIGHT=$HEIGHT" >> "$GITHUB_ENV"
+          echo "FPS=$FPS" >> "$GITHUB_ENV"
+          echo "TARGET_DURATION=$TARGET" >> "$GITHUB_ENV"
+          echo "TRANSITION_DURATION=$TRANSITION" >> "$GITHUB_ENV"
+
+          echo "======================================"
+          echo "GLOBAL CONFIGURATION"
+          echo "======================================"
+
+          echo "Resolution : ${WIDTH}x${HEIGHT}"
+          echo "FPS        : $FPS"
+          echo "Target     : $TARGET seconds"
+          echo "Transition : $TRANSITION seconds"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 08. VALIDATE SCENE TIMELINE
+      # ==========================================================
+
+      - name: Validate scene timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SCENE TIMELINE VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+          TARGET_DURATION=$(jq '.project.total_duration' scene_config.json)
+
+          EXPECTED_START=0
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            echo "Scene $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+
+            if [ "$START" -ne "$EXPECTED_START" ]; then
+              echo "ERROR: Scene $ID start is incorrect."
+              exit 1
+            fi
+
+            CALCULATED_END=$((START + DURATION))
+
+            if [ "$END" -ne "$CALCULATED_END" ]; then
+              echo "ERROR: Scene $ID end is incorrect."
+              exit 1
+            fi
+
+            EXPECTED_START="$END"
+
+          done
+
+          if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
+            echo "ERROR: Scene timeline does not end at project duration."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "SCENE TIMELINE : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 09. VALIDATE NARRATION TIMELINE
+      # ==========================================================
+
+      - name: Validate narration timeline
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "NARRATION TIMELINE VALIDATION"
+          echo "======================================"
+
+          SEGMENT_COUNT=$(jq '.narration.segments | length' scene_config.json)
+          TARGET_DURATION=$(jq '.project.total_duration' scene_config.json)
+
+          EXPECTED_START=0
+
+          for INDEX in $(seq 0 $((SEGMENT_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".narration.segments[$INDEX].id" scene_config.json)
+            START=$(jq -r ".narration.segments[$INDEX].start" scene_config.json)
+            DURATION=$(jq -r ".narration.segments[$INDEX].duration" scene_config.json)
+            END=$(jq -r ".narration.segments[$INDEX].end" scene_config.json)
+
+            echo "Narration Segment $ID"
+            echo "Start    : $START"
+            echo "Duration : $DURATION"
+            echo "End      : $END"
+
+            if [ "$START" -ne "$EXPECTED_START" ]; then
+              echo "ERROR: Narration timeline is not continuous."
+              exit 1
+            fi
+
+            CALCULATED_END=$((START + DURATION))
+
+            if [ "$END" -ne "$CALCULATED_END" ]; then
+              echo "ERROR: Narration segment end is incorrect."
+              exit 1
+            fi
+
+            EXPECTED_START="$END"
+
+          done
+
+          if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
+            echo "ERROR: Narration timeline does not end at project duration."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "NARRATION TIMELINE : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 10. VERIFY SCENE ↔ NARRATION SYNC
+      # ==========================================================
+
+      - name: Verify scene narration synchronization
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "SCENE ↔ NARRATION SYNCHRONIZATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+          SEGMENT_COUNT=$(jq '.narration.segments | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -ne "$SEGMENT_COUNT" ]; then
+            echo "ERROR: Scene count and narration count differ."
+            exit 1
+          fi
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            SCENE_START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            SCENE_END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            NARR_START=$(jq -r ".narration.segments[$INDEX].start" scene_config.json)
+            NARR_END=$(jq -r ".narration.segments[$INDEX].end" scene_config.json)
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            if [ "$SCENE_START" -ne "$NARR_START" ]; then
+              echo "ERROR: Scene/narration start mismatch."
+              exit 1
+            fi
+
+            if [ "$SCENE_END" -ne "$NARR_END" ]; then
+              echo "ERROR: Scene/narration end mismatch."
+              exit 1
+            fi
+
+            echo "Scene $ID : synchronized"
+
+          done
+
+          echo "======================================"
+          echo "SCENE ↔ NARRATION SYNC : PASSED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 11. VALIDATE DYNAMIC TEXT FORMAT
+      #
+      # CORE OF TEST 15
+      # ==========================================================
+
+      - name: Validate JSON text formatting
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "JSON TEXT FORMAT VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            FONT=$(jq -r ".scenes[$INDEX].subtitle.style.font" scene_config.json)
+            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
+
+            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+
+            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
+            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+
+            ALIGNMENT=$(jq -r ".scenes[$INDEX].subtitle.style.alignment" scene_config.json)
+
+            X=$(jq -r ".scenes[$INDEX].subtitle.style.position.x" scene_config.json)
+            Y=$(jq -r ".scenes[$INDEX].subtitle.style.position.y" scene_config.json)
+
+            OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
+            SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
+            MARGIN=$(jq -r ".scenes[$INDEX].subtitle.style.margin" scene_config.json)
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Text      : $TEXT"
+            echo "Font      : $FONT"
+            echo "Size      : $SIZE"
+            echo "Color     : $COLOR"
+            echo "Bold      : $BOLD"
+            echo "Italic    : $ITALIC"
+            echo "Alignment : $ALIGNMENT"
+            echo "Position  : $X,$Y"
+            echo "Outline   : $OUTLINE"
+            echo "Shadow    : $SHADOW"
+            echo "Margin    : $MARGIN"
+
+            if [ "$ENABLED" = "true" ]; then
+
+              if [ -z "$TEXT" ] || [ "$TEXT" = "null" ]; then
+                echo "ERROR: Empty subtitle text."
+                exit 1
+              fi
+
+              if [ -z "$COLOR" ] || [ "$COLOR" = "null" ]; then
+                echo "ERROR: Missing color."
+                exit 1
+              fi
+
+              if [[ ! "$COLOR" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+                echo "ERROR: Invalid HEX color: $COLOR"
+                exit 1
+              fi
+
+              if [ "$BOLD" != "true" ] && [ "$BOLD" != "false" ]; then
+                echo "ERROR: Bold must be true or false."
+                exit 1
+              fi
+
+              if [ "$ITALIC" != "true" ] && [ "$ITALIC" != "false" ]; then
+                echo "ERROR: Italic must be true or false."
+                exit 1
+              fi
+
+              if [ "$SIZE" -le 0 ]; then
+                echo "ERROR: Invalid font size."
+                exit 1
+              fi
+
+              if [ "$X" -lt 0 ] || [ "$X" -gt "$WIDTH" ]; then
+                echo "ERROR: X position outside video."
+                exit 1
+              fi
+
+              if [ "$Y" -lt 0 ] || [ "$Y" -gt "$HEIGHT" ]; then
+                echo "ERROR: Y position outside video."
+                exit 1
+              fi
+
+            fi
+
+          done
+
+          echo "======================================"
+          echo "ALL JSON TEXT FORMATTING : VALID"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 12. VALIDATE ASSETS
+      # ==========================================================
+
+      - name: Validate AICAP assets
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "ASSET VALIDATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+
+            if [ ! -f "$IMAGE" ]; then
+              echo "ERROR: Missing image:"
+              echo "$IMAGE"
+              exit 1
+            fi
+
+            SIZE=$(stat -c%s "$IMAGE")
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Empty image."
+              exit 1
+            fi
+
+          done
+
+          AUDIO=$(jq -r '.narration.source' scene_config.json)
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: Missing narration."
+            exit 1
+          fi
+
+          AUDIO_SIZE=$(stat -c%s "$AUDIO")
+
+          if [ "$AUDIO_SIZE" -le 0 ]; then
+            echo "ERROR: Empty narration."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "ALL ASSETS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 13. CREATE WORKING DIRECTORIES
+      # ==========================================================
+
+      - name: Create working directories
+        run: |
+          mkdir -p work
+          mkdir -p output
+
+
+      # ==========================================================
+      # 14. RENDER SCENES
+      # ==========================================================
+
+      - name: Render timeline scenes
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "TIMELINE SCENE RENDERING"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+            IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
+            DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
+
+            if [ "$INDEX" -lt $((SCENE_COUNT - 1)) ]; then
+              SOURCE_DURATION=$(awk \
+                "BEGIN {print $DURATION + $TRANSITION_DURATION}"
+              )
+            else
+              SOURCE_DURATION="$DURATION"
+            fi
+
+            FRAME_COUNT=$(awk \
+              "BEGIN {printf \"%d\", $SOURCE_DURATION * $FPS - 1}"
+            )
+
+            OUTPUT="work/scene_${ID}.mp4"
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Duration : $DURATION"
+            echo "Motion   : $MOTION"
+            echo "--------------------------------------"
+
+            case "$MOTION" in
+
+              zoom_in)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.0+0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  x='(iw-iw/zoom)*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              zoom_out)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.15-0.15*(0.5-0.5*cos(PI*on/$FRAME_COUNT))':\
+                  x='(iw-iw/zoom)/2':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              pan_left)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.12':\
+                  x='(iw-iw/zoom)*(1-on/$FRAME_COUNT)':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              pan_right)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -filter_complex "\
+                  [0:v]scale=2160:3840:force_original_aspect_ratio=increase,\
+                  crop=2160:3840,\
+                  zoompan=\
+                  z='1.12':\
+                  x='(iw-iw/zoom)*(on/$FRAME_COUNT)':\
+                  y='(ih-ih/zoom)/2':\
+                  d=1:\
+                  s=${WIDTH}x${HEIGHT}:\
+                  fps=${FPS},\
+                  format=yuv420p[v]" \
+                  -map "[v]" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -r "$FPS" \
+                  "$OUTPUT"
+                ;;
+
+              static)
+
+                ffmpeg \
+                  -y \
+                  -loop 1 \
+                  -i "$IMAGE" \
+                  -t "$SOURCE_DURATION" \
+                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:(oh-ih)/2" \
+                  -r "$FPS" \
+                  -c:v libx264 \
+                  -preset veryfast \
+                  -pix_fmt yuv420p \
+                  -an \
+                  "$OUTPUT"
+                ;;
+
+              *)
+
+                echo "ERROR: Unsupported motion:"
+                echo "$MOTION"
+                exit 1
+                ;;
+
+            esac
+
+            if [ ! -f "$OUTPUT" ]; then
+              echo "ERROR: Scene $ID was not rendered."
+              exit 1
+            fi
+
+          done
+
+          echo "======================================"
+          echo "ALL SCENES RENDERED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 15. BUILD TRANSITIONS
+      # ==========================================================
+
+      - name: Build timeline transitions
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "BUILDING TIMELINE TRANSITIONS"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          if [ "$SCENE_COUNT" -eq 1 ]; then
+
+            cp work/scene_1.mp4 work/video_core.mp4
+
+          else
+
+            INPUT_ARGS=()
+
+            for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+            do
+
+              ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+              INPUT_ARGS+=(
+                -i
+                "work/scene_${ID}.mp4"
+              )
+
+            done
+
+            FIRST_DURATION=$(jq -r '.scenes[0].duration' scene_config.json)
+
+            FILTER="[0:v][1:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${FIRST_DURATION}[v1]"
+
+            if [ "$SCENE_COUNT" -gt 2 ]; then
+
+              for INDEX in $(seq 2 $((SCENE_COUNT - 1)))
+              do
+
+                CURRENT_START=$(jq \
+                  -r ".scenes[$INDEX].start" \
+                  scene_config.json
+                )
+
+                PREVIOUS_LABEL="v$((INDEX - 1))"
+
+                FILTER="${FILTER};[${PREVIOUS_LABEL}][${INDEX}:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${CURRENT_START}[v${INDEX}]"
+
+              done
+
+            fi
+
+            FINAL_LABEL="v$((SCENE_COUNT - 1))"
+
+            ffmpeg \
+              -y \
+              "${INPUT_ARGS[@]}" \
+              -filter_complex "$FILTER" \
+              -map "[${FINAL_LABEL}]" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r "$FPS" \
+              work/video_core.mp4
+
+          fi
+
+          echo "======================================"
+          echo "TRANSITIONS COMPLETED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 16. VERIFY CORE VIDEO
+      # ==========================================================
+
+      - name: Verify core video
+        run: |
+          echo "======================================"
+          echo "CORE VIDEO VERIFICATION"
+          echo "======================================"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            work/video_core.mp4
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 17. GENERATE DYNAMIC ASS
+      #
+      # TEST 15:
+      #
+      # HEX color
+      # Bold
+      # Italic
+      #
+      # are converted from JSON to ASS.
+      # ==========================================================
+
+      - name: Generate dynamic ASS subtitles
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "GENERATING DYNAMIC ASS FROM JSON"
+          echo "======================================"
+
+          cat > work/subtitles.ass <<'ASSHEADER'
+          [Script Info]
+          ScriptType: v4.00+
+          PlayResX: 1080
+          PlayResY: 1920
+          ScaledBorderAndShadow: yes
+
+          [V4+ Styles]
+          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+          ASSHEADER
+
+          SCENE_COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ENABLED=$(jq -r ".scenes[$INDEX].subtitle.enabled" scene_config.json)
+
+            if [ "$ENABLED" != "true" ]; then
+              continue
+            fi
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
+            END=$(jq -r ".scenes[$INDEX].end" scene_config.json)
+
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            FONT=$(jq -r ".scenes[$INDEX].subtitle.style.font" scene_config.json)
+            SIZE=$(jq -r ".scenes[$INDEX].subtitle.style.size" scene_config.json)
+
+            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+
+            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
+            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+
+            ALIGNMENT=$(jq -r ".scenes[$INDEX].subtitle.style.alignment" scene_config.json)
+
+            X=$(jq -r ".scenes[$INDEX].subtitle.style.position.x" scene_config.json)
+            Y=$(jq -r ".scenes[$INDEX].subtitle.style.position.y" scene_config.json)
+
+            OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
+            SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
+
+            MARGIN=$(jq -r ".scenes[$INDEX].subtitle.style.margin" scene_config.json)
+
+            # ------------------------------------------------------
+            # Convert:
+            #
+            # #RRGGBB
+            #
+            # into ASS:
+            #
+            # &HAABBGGRR
+            #
+            # Alpha = 00
+            # ------------------------------------------------------
+
+            HEX=${COLOR#\#}
+
+            RR=${HEX:0:2}
+            GG=${HEX:2:2}
+            BB=${HEX:4:2}
+
+            ASS_COLOR="&H00${BB}${GG}${RR}"
+
+            # ------------------------------------------------------
+            # ASS uses:
+            #
+            # Bold:
+            # 0 = normal
+            # -1 = bold
+            #
+            # Italic:
+            # 0 = normal
+            # -1 = italic
+            # ------------------------------------------------------
+
+            if [ "$BOLD" = "true" ]; then
+              ASS_BOLD="-1"
+            else
+              ASS_BOLD="0"
+            fi
+
+            if [ "$ITALIC" = "true" ]; then
+              ASS_ITALIC="-1"
+            else
+              ASS_ITALIC="0"
+            fi
+
+            START_H=$((START / 3600))
+            START_M=$(((START % 3600) / 60))
+            START_S=$((START % 60))
+
+            END_H=$((END / 3600))
+            END_M=$(((END % 3600) / 60))
+            END_S=$((END % 60))
+
+            START_ASS=$(printf "%d:%02d:%05.2f" \
+              "$START_H" \
+              "$START_M" \
+              "$START_S")
+
+            END_ASS=$(printf "%d:%02d:%05.2f" \
+              "$END_H" \
+              "$END_M" \
+              "$END_S")
+
+            STYLE_NAME="Scene${ID}"
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "Text      : $TEXT"
+            echo "Font      : $FONT"
+            echo "Size      : $SIZE"
+            echo "Color     : $COLOR"
+            echo "ASS Color : $ASS_COLOR"
+            echo "Bold      : $BOLD"
+            echo "Italic    : $ITALIC"
+            echo "Position  : $X,$Y"
+            echo "Alignment : $ALIGNMENT"
+            echo "Outline   : $OUTLINE"
+            echo "Shadow    : $SHADOW"
+            echo "Margin    : $MARGIN"
+
+            # ------------------------------------------------------
+            # Create ASS style
+            # ------------------------------------------------------
+
+            printf \
+              "Style%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,80,80,%s,1\n" \
+              "$ID" \
+              "$FONT" \
+              "$SIZE" \
+              "$ASS_COLOR" \
+              "$ASS_COLOR" \
+              "&H00000000" \
+              "&H00000000" \
+              "$ASS_BOLD" \
+              "$ASS_ITALIC" \
+              "$OUTLINE" \
+              "$SHADOW" \
+              "$ALIGNMENT" \
+              "$MARGIN" \
+              >> work/subtitles.ass
+
+            # ------------------------------------------------------
+            # Add dialogue event.
+            #
+            # \pos(x,y) comes from JSON.
+            # ------------------------------------------------------
+
+            ESCAPED_TEXT=$(printf '%s' "$TEXT" | \
+              sed 's/{/\\{/g; s/}/\\}/g')
+
+            printf \
+              "Dialogue: 0,%s,%s,%s,,0,0,0,,{\\\\pos(%s,%s)}%s\n" \
+              "$START_ASS" \
+              "$END_ASS" \
+              "$STYLE_NAME" \
+              "$X" \
+              "$Y" \
+              "$ESCAPED_TEXT" \
+              >> work/subtitles.ass
+
+          done
+
+          echo "======================================"
+          echo "DYNAMIC ASS CREATED"
+          echo "======================================"
+
+          cat work/subtitles.ass
+
+
+      # ==========================================================
+      # 18. VERIFY COLOR / BOLD / ITALIC
+      # ==========================================================
+
+      - name: Verify dynamic text formatting
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "DYNAMIC TEXT FORMAT VERIFICATION"
+          echo "======================================"
+
+          SCENE_COUNT=$(jq '[.scenes[] | select(.subtitle.enabled == true)] | length' scene_config.json)
+
+          DIALOGUE_COUNT=$(grep -c "^Dialogue:" work/subtitles.ass || true)
+
+          if [ "$SCENE_COUNT" -ne "$DIALOGUE_COUNT" ]; then
+            echo "ERROR: Dialogue count mismatch."
+            exit 1
+          fi
+
+          for INDEX in $(seq 0 $((SCENE_COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
+
+            BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
+            ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
+
+            TEXT=$(jq -r ".scenes[$INDEX].subtitle.text" scene_config.json)
+
+            HEX=${COLOR#\#}
+
+            RR=${HEX:0:2}
+            GG=${HEX:2:2}
+            BB=${HEX:4:2}
+
+            ASS_COLOR="&H00${BB}${GG}${RR}"
+
+            if [ "$BOLD" = "true" ]; then
+              ASS_BOLD="-1"
+            else
+              ASS_BOLD="0"
+            fi
+
+            if [ "$ITALIC" = "true" ]; then
+              ASS_ITALIC="-1"
+            else
+              ASS_ITALIC="0"
+            fi
+
+            echo "--------------------------------------"
+            echo "Scene $ID"
+            echo "JSON color : $COLOR"
+            echo "ASS color  : $ASS_COLOR"
+            echo "Bold       : $BOLD → $ASS_BOLD"
+            echo "Italic     : $ITALIC → $ASS_ITALIC"
+
+            if ! grep -F \
+              "Style${ID}," \
+              work/subtitles.ass >/dev/null 2>&1; then
+
+              echo "ERROR: Style${ID} not found."
+              exit 1
+
+            fi
+
+            STYLE_LINE=$(grep "^Style${ID}," work/subtitles.ass)
+
+            if [[ "$STYLE_LINE" != *",$ASS_COLOR,"* ]]; then
+              echo "ERROR: Color conversion failed for Scene $ID."
+              exit 1
+            fi
+
+            if [[ "$STYLE_LINE" != *",$ASS_BOLD,"* ]]; then
+              echo "ERROR: Bold conversion failed for Scene $ID."
+              exit 1
+            fi
+
+            if [[ "$STYLE_LINE" != *",$ASS_ITALIC,"* ]]; then
+              echo "ERROR: Italic conversion failed for Scene $ID."
+              exit 1
+            fi
+
+            if ! grep -F -- "$TEXT" work/subtitles.ass >/dev/null 2>&1; then
+              echo "ERROR: Text not found for Scene $ID."
+              exit 1
+            fi
+
+            echo "Scene $ID : FORMAT VERIFIED"
+
+          done
+
+          echo "======================================"
+          echo "COLOR / BOLD / ITALIC : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 19. BURN DYNAMIC TEXT
+      # ==========================================================
+
+      - name: Burn dynamic JSON styled subtitles
+        run: |
+          echo "======================================"
+          echo "BURNING DYNAMIC JSON TEXT"
+          echo "======================================"
+
+          ffmpeg \
+            -y \
+            -i work/video_core.mp4 \
+            -vf "ass=work/subtitles.ass" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r "$FPS" \
+            -an \
+            work/video_subtitles.mp4
+
+          echo "Dynamic text formatting burned into video."
+
+
+      # ==========================================================
+      # 20. CREATE REPORT
+      # ==========================================================
+
+      - name: Create text format report
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "CREATING TEST 15 REPORT"
+          echo "======================================"
+
+          cat > work/text_format_report.txt <<EOF
+          AICAP TEST 15 — DYNAMIC JSON TEXT FORMAT
+
+          Subtitle source:
+          scene_config.json
+
+          Rendering mode:
+          JSON → ASS → FFmpeg
+
+          New capabilities tested:
+          Color
+          Bold
+          Italic
+
+          Existing capabilities retained:
+          Font
+          Size
+          Position
+          Alignment
+          Outline
+          Shadow
+          Margin
+
+          Scene styles:
+
+          $(jq -r '
+            .scenes[]
+            | select(.subtitle.enabled == true)
+            | "Scene \(.id)
+          Text: \(.subtitle.text)
+          Font: \(.subtitle.style.font)
+          Size: \(.subtitle.style.size)
+          Color: \(.subtitle.style.color)
+          Bold: \(.subtitle.style.bold)
+          Italic: \(.subtitle.style.italic)
+          Alignment: \(.subtitle.style.alignment)
+          Position: \(.subtitle.style.position.x),\(.subtitle.style.position.y)
+          Outline: \(.subtitle.style.outline)
+          Shadow: \(.subtitle.style.shadow)
+          Margin: \(.subtitle.style.margin)
+          "
+          ' scene_config.json)
+
+          Result:
+          Text color, bold and italic formatting were generated from JSON.
+          EOF
+
+          cat work/text_format_report.txt
+
+
+      # ==========================================================
+      # 21. ADD NARRATION
+      # ==========================================================
+
+      - name: Add narration
+        run: |
+          echo "======================================"
+          echo "ADDING NARRATION"
+          echo "======================================"
+
+          AUDIO=$(jq -r '.narration.source' scene_config.json)
+
+          ffmpeg \
+            -y \
+            -i work/video_subtitles.mp4 \
+            -i "$AUDIO" \
+            -filter_complex "[1:a]apad[a]" \
+            -map 0:v:0 \
+            -map "[a]" \
+            -t "$TARGET_DURATION" \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -movflags +faststart \
+            output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4
+
+          echo "Narration added."
+
+
+      # ==========================================================
+      # 22. FINAL VIDEO VERIFICATION
+      # ==========================================================
+
+      - name: Verify final Test 15 video
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "15 — DYNAMIC JSON TEXT FORMAT"
+          echo "FINAL VERIFICATION"
+          echo "======================================"
+
+          VIDEO="output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4"
+
+          if [ ! -f "$VIDEO" ]; then
+            echo "ERROR: Final video was not created."
+            exit 1
+          fi
+
+          SIZE=$(stat -c%s "$VIDEO")
+
+          echo "Output File : $VIDEO"
+          echo "File Size   : $SIZE bytes"
+
+          if [ "$SIZE" -le 0 ]; then
+            echo "ERROR: Final video is empty."
+            exit 1
+          fi
+
+          echo "--------------------------------------"
+          echo "VIDEO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "AUDIO STREAM"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels,duration \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "--------------------------------------"
+          echo "FINAL FORMAT"
+          echo "--------------------------------------"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$VIDEO"
+
+          echo "======================================"
+          echo "EXPECTED"
+          echo "======================================"
+
+          echo "Configuration     : JSON"
+          echo "Scene Count       : 4"
+
+          echo "Scene 01          : 0–10 sec"
+          echo "Scene 02          : 10–25 sec"
+          echo "Scene 03          : 25–40 sec"
+          echo "Scene 04          : 40–60 sec"
+
+          echo "--------------------------------------"
+          echo "DYNAMIC TEXT"
+          echo "--------------------------------------"
+
+          echo "Text              : JSON"
+          echo "Font              : JSON"
+          echo "Size              : JSON"
+          echo "Color             : JSON"
+          echo "Bold              : JSON"
+          echo "Italic            : JSON"
+          echo "Position          : JSON"
+          echo "Alignment         : JSON"
+          echo "Outline           : JSON"
+          echo "Shadow            : JSON"
+          echo "Margin            : JSON"
+
+          echo "--------------------------------------"
+
+          echo "Subtitle Format   : ASS"
+          echo "Narration         : Timeline Sync"
+
+          echo "Total Duration    : 60 sec"
+
+          echo "Resolution        : 1080x1920"
+          echo "FPS               : 30"
+          echo "Video Codec       : H.264"
+          echo "Audio Codec       : AAC"
+
+          echo "======================================"
+
+
+      # ==========================================================
+      # 23. UPLOAD MP4
+      # ==========================================================
+
+      - name: Upload Test 15 MP4
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-15-DYNAMIC-JSON-TEXT-FORMAT
+          path: output/AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4
+          retention-days: 1
+
+
+      # ==========================================================
+      # 24. UPLOAD JSON
+      # ==========================================================
+
+      - name: Upload Test 15 JSON
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-15-JSON-TEXT-FORMAT-CONFIG
+          path: scene_config.json
+          retention-days: 1
+
+
+      # ==========================================================
+      # 25. UPLOAD ASS
+      # ==========================================================
+
+      - name: Upload Test 15 ASS
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-15-GENERATED-ASS
+          path: work/subtitles.ass
+          retention-days: 1
+
+
+      # ==========================================================
+      # 26. UPLOAD REPORT
+      # ==========================================================
+
+      - name: Upload Test 15 report
+        uses: actions/upload-artifact@v5
+        with:
+          name: AICAP-FREE-15-TEXT-FORMAT-REPORT
+          path: work/text_format_report.txt
+          retention-days: 1
+
+
+      # ==========================================================
+      # 27. FINAL RESULT
+      # ==========================================================
+
+      - name: Test 15 final result
+        run: |
+          echo "======================================"
+          echo "AICAP FREE RENDER"
+          echo "15 — DYNAMIC JSON TEXT FORMAT"
+          echo "======================================"
+
+          echo "STATUS            : PASSED"
+          echo "CONFIGURATION     : JSON"
+
+          echo "SCENE COUNT       : 4"
+
+          echo "SCENE 01          : 0–10 sec"
+          echo "SCENE 02          : 10–25 sec"
+          echo "SCENE 03          : 25–40 sec"
+          echo "SCENE 04          : 40–60 sec"
+
+          echo "--------------------------------------"
+          echo "DYNAMIC TEXT PROPERTIES"
+          echo "--------------------------------------"
+
+          echo "Text              : JSON"
+          echo "Font              : JSON"
+          echo "Size              : JSON"
+          echo "Color             : JSON"
+          echo "Bold              : JSON"
+          echo "Italic            : JSON"
+          echo "Position          : JSON"
+          echo "Alignment         : JSON"
+          echo "Outline           : JSON"
+          echo "Shadow            : JSON"
+          echo "Margin            : JSON"
+
+          echo "--------------------------------------"
+
+          echo "Subtitle Format   : ASS"
+          echo "Narration         : Timeline Sync"
+
+          echo "Total Video       : 60 sec"
+
+          echo "Resolution        : 1080x1920"
+          echo "FPS               : 30"
+          echo "Video Codec       : H.264"
+          echo "Audio Codec       : AAC"
+
+          echo "--------------------------------------"
+
+          echo "OUTPUT:"
+          echo "AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4"
+
+          echo "VIDEO ARTIFACT:"
+          echo "AICAP-FREE-15-DYNAMIC-JSON-TEXT-FORMAT"
+
+          echo "JSON ARTIFACT:"
+          echo "AICAP-FREE-15-JSON-TEXT-FORMAT-CONFIG"
+
+          echo "ASS ARTIFACT:"
+          echo "AICAP-FREE-15-GENERATED-ASS"
+
+          echo "REPORT ARTIFACT:"
+          echo "AICAP-FREE-15-TEXT-FORMAT-REPORT"
+
+          echo "======================================"
+          echo "TEST 15 STATUS : PASSED"
+          echo "======================================"
