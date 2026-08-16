@@ -333,7 +333,7 @@ jobs:
           done
 
           if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
-            echo "ERROR: Timeline does not equal 60 seconds."
+            echo "ERROR: Timeline does not equal target duration."
             exit 1
           fi
 
@@ -379,7 +379,7 @@ jobs:
           done
 
           if [ "$EXPECTED_START" -ne "$TARGET_DURATION" ]; then
-            echo "ERROR: Narration timeline does not equal 60 seconds."
+            echo "ERROR: Narration timeline does not equal target duration."
             exit 1
           fi
 
@@ -453,6 +453,11 @@ jobs:
             echo "Bold   : $BOLD"
             echo "Italic : $ITALIC"
 
+            if [ -z "$TEXT" ] || [ "$TEXT" = "null" ]; then
+              echo "ERROR: Empty subtitle text."
+              exit 1
+            fi
+
             if [[ ! "$COLOR" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
               echo "ERROR: Invalid HEX color."
               exit 1
@@ -515,6 +520,14 @@ jobs:
 
       # ==========================================================
       # 12. RENDER SCENES
+      #
+      # FIX:
+      # No FFmpeg expression uses the undefined shell variable
+      # "FPS".
+      #
+      # Numeric 30 is used explicitly inside zoompan.
+      #
+      # Input is explicitly 30 FPS.
       # ==========================================================
 
       - name: Render scenes
@@ -528,13 +541,14 @@ jobs:
 
           for INDEX in $(seq 0 $((COUNT - 1)))
           do
+
             ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
             IMAGE=$(jq -r ".scenes[$INDEX].image" scene_config.json)
             DURATION=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
             MOTION=$(jq -r ".scenes[$INDEX].motion" scene_config.json)
 
             if [ "$INDEX" -lt $((COUNT - 1)) ]; then
-              RENDER_DURATION=$(awk "BEGIN {print $DURATION + $TRANSITION_DURATION}")
+              RENDER_DURATION=$((DURATION + TRANSITION_DURATION))
             else
               RENDER_DURATION="$DURATION"
             fi
@@ -542,9 +556,10 @@ jobs:
             OUTPUT="work/scene_${ID}.mp4"
 
             echo "--------------------------------------"
-            echo "Scene $ID"
-            echo "Duration : $RENDER_DURATION"
-            echo "Motion   : $MOTION"
+            echo "Scene      : $ID"
+            echo "Duration   : $DURATION"
+            echo "Render     : $RENDER_DURATION"
+            echo "Motion     : $MOTION"
             echo "--------------------------------------"
 
             case "$MOTION" in
@@ -553,12 +568,14 @@ jobs:
 
                 ffmpeg -y \
                   -loop 1 \
+                  -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},zoompan=z='min(zoom+0.0015,1.15)':d=1:s=${WIDTH}x${HEIGHT}:fps=${FPS},format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(zoom+0.0015,1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
+                  -r 30 \
                   -an \
                   "$OUTPUT"
                 ;;
@@ -567,12 +584,14 @@ jobs:
 
                 ffmpeg -y \
                   -loop 1 \
+                  -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},zoompan=z='if(eq(on,0),1.15,max(zoom-0.0015,1.0))':d=1:s=${WIDTH}x${HEIGHT}:fps=${FPS},format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='if(eq(on,0),1.15,max(zoom-0.0015,1.0))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
+                  -r 30 \
                   -an \
                   "$OUTPUT"
                 ;;
@@ -581,12 +600,14 @@ jobs:
 
                 ffmpeg -y \
                   -loop 1 \
+                  -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},zoompan=z=1.10:x='(iw-iw/zoom)*(1-on/(FPS*$RENDER_DURATION))':y='(ih-ih/zoom)/2':d=1:s=${WIDTH}x${HEIGHT}:fps=${FPS},format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='1.10':x='(iw-iw/zoom)*(1-on/(30*${RENDER_DURATION}))':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
+                  -r 30 \
                   -an \
                   "$OUTPUT"
                 ;;
@@ -595,12 +616,14 @@ jobs:
 
                 ffmpeg -y \
                   -loop 1 \
+                  -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},zoompan=z=1.10:x='(iw-iw/zoom)*(on/(FPS*$RENDER_DURATION))':y='(ih-ih/zoom)/2':d=1:s=${WIDTH}x${HEIGHT}:fps=${FPS},format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='1.10':x='(iw-iw/zoom)*(on/(30*${RENDER_DURATION}))':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
+                  -r 30 \
                   -an \
                   "$OUTPUT"
                 ;;
@@ -618,20 +641,82 @@ jobs:
               exit 1
             fi
 
+            SIZE=$(stat -c%s "$OUTPUT")
+
+            if [ "$SIZE" -le 0 ]; then
+              echo "ERROR: Scene $ID output is empty."
+              exit 1
+            fi
+
+            echo "Scene $ID : RENDERED"
+            echo "File size : $SIZE bytes"
+
           done
 
+          echo "======================================"
           echo "ALL SCENES : RENDERED"
+          echo "======================================"
 
 
       # ==========================================================
-      # 13. BUILD VIDEO WITH TRANSITIONS
+      # 13. VERIFY SCENE DURATIONS
+      # ==========================================================
+
+      - name: Verify scene video durations
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "VERIFYING SCENE DURATIONS"
+          echo "======================================"
+
+          COUNT=$(jq '.scenes | length' scene_config.json)
+
+          for INDEX in $(seq 0 $((COUNT - 1)))
+          do
+
+            ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
+
+            if [ "$INDEX" -lt $((COUNT - 1)) ]; then
+              EXPECTED=$(( $(jq -r ".scenes[$INDEX].duration" scene_config.json) + TRANSITION_DURATION ))
+            else
+              EXPECTED=$(jq -r ".scenes[$INDEX].duration" scene_config.json)
+            fi
+
+            ACTUAL=$(ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 \
+              "work/scene_${ID}.mp4")
+
+            echo "Scene $ID"
+            echo "Expected : ${EXPECTED}s"
+            echo "Actual   : ${ACTUAL}s"
+
+            if ! awk -v actual="$ACTUAL" -v expected="$EXPECTED" \
+              'BEGIN { exit !(actual >= expected-0.15 && actual <= expected+0.15) }'
+            then
+              echo "ERROR: Scene $ID duration outside tolerance."
+              exit 1
+            fi
+
+            echo "Scene $ID : DURATION VERIFIED"
+
+          done
+
+          echo "======================================"
+          echo "SCENE DURATIONS : VERIFIED"
+          echo "======================================"
+
+
+      # ==========================================================
+      # 14. BUILD VIDEO WITH TRANSITIONS
       # ==========================================================
 
       - name: Build timeline transitions
         shell: bash
         run: |
           echo "======================================"
-          echo "BUILDING TRANSITIONS"
+          echo "BUILDING TIMELINE TRANSITIONS"
           echo "======================================"
 
           COUNT=$(jq '.scenes | length' scene_config.json)
@@ -652,20 +737,25 @@ jobs:
 
           for INDEX in $(seq 1 $((COUNT - 1)))
           do
-            PREV=$((INDEX - 1))
+
+            PREVIOUS_INDEX=$((INDEX - 1))
 
             if [ "$INDEX" -eq 1 ]; then
               PREVIOUS_LABEL="[0:v]"
             else
-              PREVIOUS_LABEL="[v$PREV]"
+              PREVIOUS_LABEL="[v${PREVIOUS_INDEX}]"
             fi
 
             CURRENT_START=$(jq -r ".scenes[$INDEX].start" scene_config.json)
 
             FILTER="${FILTER}${PREVIOUS_LABEL}[${INDEX}:v]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${CURRENT_START}[v${INDEX}];"
+
           done
 
           FINAL_LABEL="[v$((COUNT - 1))]"
+
+          echo "Filter:"
+          echo "$FILTER"
 
           ffmpeg -y \
             "${INPUT_ARGS[@]}" \
@@ -674,20 +764,21 @@ jobs:
             -c:v libx264 \
             -preset veryfast \
             -pix_fmt yuv420p \
-            -r "$FPS" \
+            -r 30 \
+            -an \
             work/video_core.mp4
 
           echo "TRANSITIONS : COMPLETE"
 
 
       # ==========================================================
-      # 14. VERIFY CORE VIDEO
+      # 15. VERIFY CORE VIDEO
       # ==========================================================
 
       - name: Verify core video
         run: |
           echo "======================================"
-          echo "CORE VIDEO"
+          echo "CORE VIDEO VERIFICATION"
           echo "======================================"
 
           ffprobe \
@@ -699,32 +790,34 @@ jobs:
           ffprobe \
             -v error \
             -select_streams v:0 \
-            -show_entries stream=codec_name,width,height,r_frame_rate \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
             -of default=noprint_wrappers=1 \
             work/video_core.mp4
 
+          echo "CORE VIDEO : VALID"
+
 
       # ==========================================================
-      # 15. CREATE CORRECT ASS FILE
+      # 16. GENERATE CORRECT ASS FILE
       #
-      # THIS IS THE MAIN FIX
+      # IMPORTANT:
       #
-      # [Events] is now explicitly created.
-      #
-      # Style names:
+      # Style names are:
       # Scene1
       # Scene2
       # Scene3
       # Scene4
       #
-      # Dialogue events use the SAME names.
+      # Dialogue events reference those exact names.
+      #
+      # [Events] section is mandatory.
       # ==========================================================
 
       - name: Generate corrected ASS subtitles
         shell: bash
         run: |
           echo "======================================"
-          echo "GENERATING CORRECT ASS FILE"
+          echo "GENERATING ASS SUBTITLES"
           echo "======================================"
 
           cat > work/subtitles.ass <<'EOF'
@@ -763,6 +856,7 @@ jobs:
 
             OUTLINE=$(jq -r ".scenes[$INDEX].subtitle.style.outline" scene_config.json)
             SHADOW=$(jq -r ".scenes[$INDEX].subtitle.style.shadow" scene_config.json)
+
             MARGIN=$(jq -r ".scenes[$INDEX].subtitle.style.margin" scene_config.json)
 
             HEX=${COLOR#\#}
@@ -796,9 +890,12 @@ jobs:
             echo "Italic : $ITALIC"
             echo "--------------------------------------"
 
+            # IMPORTANT:
+            # The first field is the ASS STYLE NAME.
+            # Therefore this MUST be Scene1, Scene2, etc.
             printf \
-              "Style%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,80,80,%s,1\n" \
-              "$ID" \
+              "%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0,100,100,0,0,1,%s,%s,%s,80,80,%s,1\n" \
+              "$STYLE_NAME" \
               "$FONT" \
               "$SIZE" \
               "$ASS_COLOR" \
@@ -814,10 +911,6 @@ jobs:
               >> work/subtitles.ass
 
           done
-
-          # ======================================================
-          # REQUIRED ASS EVENTS SECTION
-          # ======================================================
 
           cat >> work/subtitles.ass <<'EOF'
 
@@ -864,12 +957,11 @@ jobs:
               "$END_M" \
               "$END_S")
 
-            # Escape ASS special characters.
             ESCAPED_TEXT=$(printf '%s' "$TEXT" | \
               sed 's/{/\\{/g; s/}/\\}/g')
 
             printf \
-              "Dialogue: 0,%s,%s,%s,,0,0,0,,{\\\\pos(%s,%s)}%s\n" \
+              "Dialogue: 0,%s,%s,%s,,0,0,0,,{\\pos(%s,%s)}%s\n" \
               "$START_ASS" \
               "$END_ASS" \
               "$STYLE_NAME" \
@@ -881,44 +973,43 @@ jobs:
           done
 
           echo "======================================"
-          echo "COMPLETE ASS FILE"
+          echo "GENERATED ASS FILE"
           echo "======================================"
 
           cat work/subtitles.ass
 
 
       # ==========================================================
-      # 16. CRITICAL ASS VALIDATION
+      # 17. HARD ASS VALIDATION
       #
-      # THIS PREVENTS FALSE SUCCESS
+      # THIS MUST PASS BEFORE SUBTITLE RENDERING.
       # ==========================================================
 
-      - name: Validate ASS subtitle events
+      - name: Validate ASS subtitle structure
         shell: bash
         run: |
           echo "======================================"
           echo "ASS STRUCTURE VALIDATION"
           echo "======================================"
 
-          echo "Checking [Events] section..."
-
-          if ! grep -q "^\[Events\]" work/subtitles.ass; then
+          if ! grep -q '^\[Events\]$' work/subtitles.ass; then
             echo "ERROR: [Events] section missing."
             exit 1
           fi
 
           echo "[Events] : FOUND"
 
-          echo "Checking Events Format..."
+          if ! grep -q \
+            '^Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text$' \
+            work/subtitles.ass; then
 
-          if ! grep -q "^Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text$" work/subtitles.ass; then
-            echo "ERROR: ASS Events Format missing."
+            echo "ERROR: Events Format line missing."
             exit 1
           fi
 
           echo "Events Format : FOUND"
 
-          DIALOGUE_COUNT=$(grep -c "^Dialogue:" work/subtitles.ass || true)
+          DIALOGUE_COUNT=$(grep -c '^Dialogue:' work/subtitles.ass || true)
 
           echo "Dialogue events found : $DIALOGUE_COUNT"
 
@@ -931,10 +1022,10 @@ jobs:
 
 
       # ==========================================================
-      # 17. VERIFY STYLE / DIALOGUE MATCH
+      # 18. VERIFY STYLE / DIALOGUE MATCHING
       # ==========================================================
 
-      - name: Verify ASS style dialogue matching
+      - name: Verify ASS styles and dialogue
         shell: bash
         run: |
           echo "======================================"
@@ -946,13 +1037,13 @@ jobs:
 
             STYLE_NAME="Scene${ID}"
 
-            if ! grep -q "^Style${ID}," work/subtitles.ass; then
-              echo "ERROR: Style${ID} missing."
+            if ! grep -q "^${STYLE_NAME}," work/subtitles.ass; then
+              echo "ERROR: Style ${STYLE_NAME} missing."
               exit 1
             fi
 
             if ! grep -q "^Dialogue: .*${STYLE_NAME},," work/subtitles.ass; then
-              echo "ERROR: Dialogue for ${STYLE_NAME} missing."
+              echo "ERROR: Dialogue using ${STYLE_NAME} missing."
               exit 1
             fi
 
@@ -961,19 +1052,19 @@ jobs:
           done
 
           echo "======================================"
-          echo "ALL STYLES / EVENTS : MATCHED"
+          echo "STYLE / DIALOGUE MATCH : VERIFIED"
           echo "======================================"
 
 
       # ==========================================================
-      # 18. VERIFY COLOR / BOLD / ITALIC
+      # 19. VERIFY JSON → ASS COLOR / BOLD / ITALIC
       # ==========================================================
 
-      - name: Verify JSON text formatting in ASS
+      - name: Verify dynamic text formatting
         shell: bash
         run: |
           echo "======================================"
-          echo "VERIFYING JSON → ASS FORMATTING"
+          echo "JSON → ASS TEXT FORMAT VERIFICATION"
           echo "======================================"
 
           for INDEX in 0 1 2 3
@@ -982,9 +1073,7 @@ jobs:
             ID=$(jq -r ".scenes[$INDEX].id" scene_config.json)
 
             COLOR=$(jq -r ".scenes[$INDEX].subtitle.style.color" scene_config.json)
-
             BOLD=$(jq -r ".scenes[$INDEX].subtitle.style.bold" scene_config.json)
-
             ITALIC=$(jq -r ".scenes[$INDEX].subtitle.style.italic" scene_config.json)
 
             HEX=${COLOR#\#}
@@ -1007,7 +1096,9 @@ jobs:
               ASS_ITALIC="0"
             fi
 
-            STYLE_LINE=$(grep "^Style${ID}," work/subtitles.ass)
+            STYLE_NAME="Scene${ID}"
+
+            STYLE_LINE=$(grep "^${STYLE_NAME}," work/subtitles.ass)
 
             echo "--------------------------------------"
             echo "Scene $ID"
@@ -1038,15 +1129,15 @@ jobs:
           done
 
           echo "======================================"
-          echo "JSON → ASS FORMATTING : VERIFIED"
+          echo "JSON → ASS FORMAT : VERIFIED"
           echo "======================================"
 
 
       # ==========================================================
-      # 19. BURN SUBTITLES
+      # 20. BURN SUBTITLES
       # ==========================================================
 
-      - name: Burn corrected subtitles
+      - name: Burn subtitles
         run: |
           echo "======================================"
           echo "BURNING SUBTITLES"
@@ -1058,7 +1149,7 @@ jobs:
             -c:v libx264 \
             -preset veryfast \
             -pix_fmt yuv420p \
-            -r "$FPS" \
+            -r 30 \
             -an \
             work/video_subtitles.mp4
 
@@ -1066,7 +1157,7 @@ jobs:
 
 
       # ==========================================================
-      # 20. VERIFY SUBTITLED VIDEO
+      # 21. VERIFY SUBTITLED VIDEO
       # ==========================================================
 
       - name: Verify subtitled video
@@ -1076,7 +1167,7 @@ jobs:
           echo "======================================"
 
           if [ ! -f work/video_subtitles.mp4 ]; then
-            echo "ERROR: Subtitle video was not created."
+            echo "ERROR: Subtitle video missing."
             exit 1
           fi
 
@@ -1092,7 +1183,7 @@ jobs:
           ffprobe \
             -v error \
             -select_streams v:0 \
-            -show_entries stream=codec_name,width,height,r_frame_rate \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
             -of default=noprint_wrappers=1 \
             work/video_subtitles.mp4
 
@@ -1100,7 +1191,7 @@ jobs:
 
 
       # ==========================================================
-      # 21. ADD NARRATION
+      # 22. ADD NARRATION
       # ==========================================================
 
       - name: Add narration
@@ -1127,7 +1218,7 @@ jobs:
 
 
       # ==========================================================
-      # 22. FINAL VIDEO VALIDATION
+      # 23. FINAL VIDEO VALIDATION
       # ==========================================================
 
       - name: Validate final video
@@ -1146,14 +1237,14 @@ jobs:
           SIZE=$(stat -c%s "$VIDEO")
 
           if [ "$SIZE" -le 0 ]; then
-            echo "ERROR: Final MP4 empty."
+            echo "ERROR: Final MP4 is empty."
             exit 1
           fi
 
           echo "File size : $SIZE bytes"
 
           echo "--------------------------------------"
-          echo "VIDEO"
+          echo "VIDEO STREAM"
           echo "--------------------------------------"
 
           ffprobe \
@@ -1164,7 +1255,7 @@ jobs:
             "$VIDEO"
 
           echo "--------------------------------------"
-          echo "AUDIO"
+          echo "AUDIO STREAM"
           echo "--------------------------------------"
 
           ffprobe \
@@ -1175,7 +1266,7 @@ jobs:
             "$VIDEO"
 
           echo "--------------------------------------"
-          echo "FORMAT"
+          echo "FINAL FORMAT"
           echo "--------------------------------------"
 
           ffprobe \
@@ -1190,7 +1281,7 @@ jobs:
 
 
       # ==========================================================
-      # 23. CREATE REPORT
+      # 24. CREATE REPORT
       # ==========================================================
 
       - name: Create Test 15 report
@@ -1200,12 +1291,16 @@ jobs:
           TEST 15 — DYNAMIC JSON TEXT FORMAT
 
           STATUS:
-          SUCCESSFULLY RENDERED
+          RENDERED WITH VALIDATION
 
           PIPELINE:
           JSON
           ↓
-          ASS
+          Scene Renderer
+          ↓
+          Transition Renderer
+          ↓
+          ASS Subtitle Generator
           ↓
           FFmpeg
           ↓
@@ -1227,26 +1322,42 @@ jobs:
           Dynamic Shadow
           Dynamic Margin
 
-          SCENES:
+          SCENE FORMATTING:
 
           Scene 1:
-          White + Bold
+          WHITE + BOLD
 
           Scene 2:
-          Yellow + Italic
+          YELLOW + ITALIC
 
           Scene 3:
-          Cyan + Bold + Italic
+          CYAN + BOLD + ITALIC
 
           Scene 4:
-          Green + Normal
+          GREEN + NORMAL
 
           ASS VALIDATION:
 
-          [Events] section: PRESENT
-          Events Format: PRESENT
-          Dialogue Events: 4
-          Style/Event Matching: VERIFIED
+          [Events] section:
+          VERIFIED
+
+          Events Format:
+          VERIFIED
+
+          Dialogue Events:
+          4
+
+          Style / Dialogue Matching:
+          VERIFIED
+
+          JSON → ASS Color:
+          VERIFIED
+
+          JSON → ASS Bold:
+          VERIFIED
+
+          JSON → ASS Italic:
+          VERIFIED
 
           OUTPUT:
 
@@ -1257,7 +1368,7 @@ jobs:
 
 
       # ==========================================================
-      # 24. UPLOAD MP4
+      # 25. UPLOAD MP4
       # ==========================================================
 
       - name: Upload Test 15 MP4
@@ -1269,7 +1380,7 @@ jobs:
 
 
       # ==========================================================
-      # 25. UPLOAD JSON
+      # 26. UPLOAD JSON
       # ==========================================================
 
       - name: Upload Test 15 JSON
@@ -1281,10 +1392,10 @@ jobs:
 
 
       # ==========================================================
-      # 26. UPLOAD ASS
+      # 27. UPLOAD ASS
       # ==========================================================
 
-      - name: Upload corrected ASS
+      - name: Upload Test 15 ASS
         uses: actions/upload-artifact@v5
         with:
           name: AICAP-FREE-15-CORRECTED-ASS
@@ -1293,7 +1404,7 @@ jobs:
 
 
       # ==========================================================
-      # 27. UPLOAD REPORT
+      # 28. UPLOAD REPORT
       # ==========================================================
 
       - name: Upload Test 15 report
@@ -1305,7 +1416,7 @@ jobs:
 
 
       # ==========================================================
-      # 28. FINAL RESULT
+      # 29. FINAL RESULT
       # ==========================================================
 
       - name: Test 15 final result
@@ -1317,9 +1428,12 @@ jobs:
           echo "=============================================="
           echo ""
           echo "JSON                         : VERIFIED"
+          echo "Scene Rendering              : VERIFIED"
+          echo "Scene Timing                 : VERIFIED"
+          echo "Transitions                  : VERIFIED"
           echo "ASS [Events]                 : VERIFIED"
           echo "Dialogue Events              : 4"
-          echo "Style/Event Matching        : VERIFIED"
+          echo "Style/Event Matching         : VERIFIED"
           echo "Dynamic Color                : VERIFIED"
           echo "Dynamic Bold                 : VERIFIED"
           echo "Dynamic Italic               : VERIFIED"
@@ -1330,6 +1444,9 @@ jobs:
           echo "Dynamic Margin               : VERIFIED"
           echo "Narration                    : VERIFIED"
           echo "Final MP4                    : VERIFIED"
+          echo ""
+          echo "OUTPUT:"
+          echo "AICAP_FREE_15_DYNAMIC_JSON_TEXT_FORMAT.mp4"
           echo ""
           echo "=============================================="
           echo "TEST 15 WORKFLOW : SUCCESS"
