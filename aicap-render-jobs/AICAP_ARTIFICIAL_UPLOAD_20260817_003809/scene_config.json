@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "AICAP_ARTIFICIAL_UPLOAD_20260817_003809",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 60
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP_ARTIFICIAL_UPLOAD_20260817_003809/narration.mp3",
+    "mode": "timeline_sync"
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP_ARTIFICIAL_UPLOAD_20260817_003809/scene_01.jpg",
+      "start": 0,
+      "duration": 10,
+      "motion": "zoom_in"
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP_ARTIFICIAL_UPLOAD_20260817_003809/scene_02.jpg",
+      "start": 10,
+      "duration": 15,
+      "motion": "zoom_out"
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP_ARTIFICIAL_UPLOAD_20260817_003809/scene_03.jpg",
+      "start": 25,
+      "duration": 16,
+      "motion": "pan_left"
+    },
+    {
+      "id": 4,
+      "image": "aicap-render-jobs/AICAP_ARTIFICIAL_UPLOAD_20260817_003809/scene_04.jpg",
+      "start": 41,
+      "duration": 19,
+      "motion": "pan_right"
+    }
+  ]
+}
