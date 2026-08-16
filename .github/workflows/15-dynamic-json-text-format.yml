@@ -886,8 +886,7 @@ jobs:
 
           echo "ASS GENERATION : COMPLETE"
 
-
-          # ==========================================================
+      # ==========================================================
       # 17. ROBUST ASS VALIDATION
       # ==========================================================
 
@@ -922,33 +921,35 @@ jobs:
               raise SystemExit(1)
 
           expected = [
-    {
-        "size": "84",
-        "color": "FFFFFF",
-        "bold": "1",
-        "italic": "0"
-    },
-    {
-        "size": "82",
-        "color": "FFFF00",
-        "bold": "0",
-        "italic": "1"
-    },
-    {
-        "size": "80",
-        "color": "00FFFF",
-        "bold": "1",
-        "italic": "1"
-    },
-    {
-        "size": "84",
-        "color": "00FF00",
-        "bold": "0",
-        "italic": "0"
-    }
-]
+              {
+                  "size": "84",
+                  "color": "FFFFFF",
+                  "bold": "1",
+                  "italic": "0"
+              },
+              {
+                  "size": "82",
+                  "color": "FFFF00",
+                  "bold": "0",
+                  "italic": "1"
+              },
+              {
+                  "size": "80",
+                  "color": "00FFFF",
+                  "bold": "1",
+                  "italic": "1"
+              },
+              {
+                  "size": "84",
+                  "color": "00FF00",
+                  "bold": "0",
+                  "italic": "0"
+              }
+          ]
+
           for number, (line, wanted) in enumerate(
-              zip(dialogue, expected), start=1
+              zip(dialogue, expected),
+              start=1
           ):
 
               print("")
@@ -980,7 +981,6 @@ jobs:
 
               print(f"Font size : {actual_size}px VERIFIED")
 
-
               # --------------------------------------------------
               # COLOR
               # --------------------------------------------------
@@ -996,8 +996,6 @@ jobs:
 
               actual_ass_color = color_match.group(1).upper()
 
-              # ASS stores colours as AABBGGRR.
-              # Convert expected RGB to ASS BGR.
               rgb = wanted["color"].upper()
 
               expected_ass_color = (
@@ -1020,7 +1018,6 @@ jobs:
                   f"(ASS {actual_ass_color}) VERIFIED"
               )
 
-
               # --------------------------------------------------
               # BOLD
               # --------------------------------------------------
@@ -1041,7 +1038,6 @@ jobs:
                   raise SystemExit(1)
 
               print(f"Bold      : {actual_bold} VERIFIED")
-
 
               # --------------------------------------------------
               # ITALIC
@@ -1064,7 +1060,6 @@ jobs:
 
               print(f"Italic    : {actual_italic} VERIFIED")
 
-
               # --------------------------------------------------
               # OUTLINE
               # --------------------------------------------------
@@ -1074,7 +1069,6 @@ jobs:
                   raise SystemExit(1)
 
               print("Outline   : 5 VERIFIED")
-
 
               # --------------------------------------------------
               # SHADOW
@@ -1086,24 +1080,24 @@ jobs:
 
               print("Shadow    : 3 VERIFIED")
 
-
               # --------------------------------------------------
               # POSITION
               # --------------------------------------------------
 
-              if not re.search(r"\\pos\(540,1510\)|\\pos\(540,1580\)", line):
+              if not re.search(
+                  r"\\pos\(540,1510\)|\\pos\(540,1580\)",
+                  line
+              ):
                   print("ERROR: Position command missing.")
                   raise SystemExit(1)
 
               print("Position  : VERIFIED")
-
 
           print("")
           print("======================================")
           print("ASS FORMAT : FULLY VERIFIED")
           print("======================================")
           PY
-
           
       # ==========================================================
       # 18. BURN SUBTITLES
