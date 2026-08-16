@@ -128,11 +128,11 @@ jobs:
 
                 "subtitle": {
                   "enabled": true,
-                  "text": "Artificial intelligence is changing the world.",
+                  "text": "Artificial intelligence is\\nchanging the world.",
 
                   "style": {
                     "font": "Arial",
-                    "size": 120,
+                    "size": 80,
                     "color": "#FFFFFF",
                     "bold": true,
                     "italic": false,
@@ -160,11 +160,11 @@ jobs:
 
                 "subtitle": {
                   "enabled": true,
-                  "text": "It helps people work faster and smarter.",
+                  "text": "It helps people work\\nfaster and smarter.",
 
                   "style": {
                     "font": "Arial",
-                    "size": 112,
+                    "size": 76,
                     "color": "#FFFF00",
                     "bold": false,
                     "italic": true,
@@ -192,11 +192,11 @@ jobs:
 
                 "subtitle": {
                   "enabled": true,
-                  "text": "Creative tools can turn ideas into powerful stories.",
+                  "text": "Creative tools can turn ideas\\ninto powerful stories.",
 
                   "style": {
                     "font": "Arial",
-                    "size": 115,
+                    "size": 74,
                     "color": "#00FFFF",
                     "bold": true,
                     "italic": true,
@@ -224,11 +224,11 @@ jobs:
 
                 "subtitle": {
                   "enabled": true,
-                  "text": "AICAP can bring the complete story together.",
+                  "text": "AICAP can bring the complete\\nstory together.",
 
                   "style": {
                     "font": "Arial",
-                    "size": 120,
+                    "size": 80,
                     "color": "#00FF00",
                     "bold": false,
                     "italic": false,
@@ -446,8 +446,8 @@ jobs:
             echo "Font size : $SIZE"
             echo "Color     : $COLOR"
 
-            if [ "$SIZE" -lt 100 ]; then
-              echo "ERROR: Subtitle size is below 100."
+            if [ "$SIZE" -lt 70 ]; then
+              echo "ERROR: Subtitle size is below 70."
               exit 1
             fi
 
@@ -843,6 +843,9 @@ jobs:
               # Escape ASS special braces in user text.
               text = text.replace("{", r"\{").replace("}", r"\}")
 
+              # Convert JSON newline characters into ASS line breaks.
+              text = text.replace("\\n", r"\N").replace("\n", r"\N")
+
               inline = (
                   f"{{\\fs{size}"
                   f"\\c{ass_color}"
@@ -959,6 +962,16 @@ jobs:
 
               print("Dialogue:")
               print(line)
+
+              # --------------------------------------------------
+              # LINE BREAKS
+              # --------------------------------------------------
+
+              if r"\N" not in line:
+                  print("ERROR: Subtitle line break (\\N) missing.")
+                  raise SystemExit(1)
+
+              print("Line breaks : VERIFIED")
 
               # --------------------------------------------------
               # FONT SIZE
@@ -1232,7 +1245,7 @@ jobs:
         run: |
           cat > work/test15-report.txt <<'EOF'
           AICAP FREE VIDEO RENDERER
-          TEST 15 — LARGE CLEAR INLINE SUBTITLES
+          TEST 15 — LARGE CLEAR TWO-LINE INLINE SUBTITLES
 
           STATUS:
           RENDERED WITH VALIDATION
@@ -1245,20 +1258,23 @@ jobs:
           SUBTITLE SIZES:
 
           Scene 1:
-          120px
+          80px
           WHITE + BOLD
 
           Scene 2:
-          112px
+          76px
           YELLOW + ITALIC
 
           Scene 3:
-          115px
+          74px
           CYAN + BOLD + ITALIC
 
           Scene 4:
-          120px
+          80px
           GREEN + NORMAL
+
+          SUBTITLE LINE BREAKS:
+          VERIFIED
 
           INLINE FONT SIZE:
           VERIFIED
@@ -1354,7 +1370,7 @@ jobs:
           echo ""
           echo "=============================================="
           echo "AICAP FREE VIDEO RENDERER"
-          echo "TEST 15 — LARGE CLEAR INLINE SUBTITLES"
+          echo "TEST 15 — LARGE CLEAR TWO-LINE INLINE SUBTITLES"
           echo "=============================================="
           echo ""
           echo "JSON                         : VERIFIED"
