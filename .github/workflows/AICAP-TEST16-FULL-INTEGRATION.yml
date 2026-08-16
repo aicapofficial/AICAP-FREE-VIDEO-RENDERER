@@ -569,7 +569,7 @@ jobs:
                   -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(zoom+0.0015,1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(pzoom+0.004,1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
@@ -585,7 +585,7 @@ jobs:
                   -framerate 30 \
                   -i "$IMAGE" \
                   -t "$RENDER_DURATION" \
-                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='if(eq(on,0),1.15,max(zoom-0.0015,1.0))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
+                  -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='if(eq(on,0),1.15,max(pzoom-0.003,1.0))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p" \
                   -c:v libx264 \
                   -preset veryfast \
                   -pix_fmt yuv420p \
@@ -653,8 +653,79 @@ jobs:
           echo "ALL SCENES : RENDERED"
 
 
+
       # ==========================================================
-      # 13. VERIFY SCENE DURATIONS
+      # 13. VERIFY ACTUAL SCENE MOTION
+      # ==========================================================
+
+      - name: Verify actual scene motion
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "ACTUAL SCENE MOTION VERIFICATION"
+          echo "======================================"
+
+          verify_motion() {
+            SCENE="$1"
+            EXPECTED="$2"
+            FILE="work/scene_${SCENE}.mp4"
+
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Scene $SCENE output missing."
+              exit 1
+            fi
+
+            ffmpeg -y -v error \
+              -i "$FILE" \
+              -frames:v 1 \
+              "work/scene_${SCENE}_first.jpg"
+
+            ffmpeg -y -v error \
+              -sseof -0.10 \
+              -i "$FILE" \
+              -frames:v 1 \
+              "work/scene_${SCENE}_last.jpg"
+
+            SSIM_LINE=$(ffmpeg -v error \
+              -i "work/scene_${SCENE}_first.jpg" \
+              -i "work/scene_${SCENE}_last.jpg" \
+              -lavfi "ssim=stats_file=-" \
+              -f null - 2>&1 | grep "All:" | tail -n 1 || true)
+
+            SSIM=$(echo "$SSIM_LINE" | sed -n 's/.*Y:\([0-9.]*\).*/\1/p')
+
+            echo "Scene $SCENE"
+            echo "Expected motion : $EXPECTED"
+            echo "SSIM first/last : ${SSIM:-UNAVAILABLE}"
+
+            if [ -z "$SSIM" ]; then
+              echo "ERROR: Could not calculate motion comparison."
+              exit 1
+            fi
+
+            if awk -v s="$SSIM" 'BEGIN { exit !(s >= 0.998) }'; then
+              echo "ERROR: Scene $SCENE appears visually static."
+              echo "Expected actual motion: $EXPECTED"
+              exit 1
+            fi
+
+            echo "Scene $SCENE motion : VERIFIED"
+            echo ""
+          }
+
+          verify_motion 1 "ZOOM IN"
+          verify_motion 2 "ZOOM OUT"
+          verify_motion 3 "PAN LEFT"
+          verify_motion 4 "PAN RIGHT"
+
+          echo "======================================"
+          echo "ALL FOUR SCENE MOTIONS VERIFIED"
+          echo "======================================"
+
+      # ==========================================================
+      # 14. VERIFY SCENE DURATIONS
       # ==========================================================
 
       - name: Verify scene video durations
@@ -700,7 +771,7 @@ jobs:
 
 
       # ==========================================================
-      # 14. BUILD TRANSITIONS
+      # 15. BUILD TRANSITIONS
       # ==========================================================
 
       - name: Build timeline transitions
@@ -917,7 +988,7 @@ jobs:
           echo "ASS GENERATION : COMPLETE"
 
       # ==========================================================
-      # 17. ROBUST ASS VALIDATION
+      # 18. ROBUST ASS VALIDATION
       # ==========================================================
 
       - name: Validate generated ASS
@@ -1280,7 +1351,7 @@ jobs:
 
 
       # ==========================================================
-      # 22. FINAL VALIDATION
+      # 23. FINAL VALIDATION
       # ==========================================================
 
       - name: Validate final video
@@ -1329,7 +1400,7 @@ jobs:
 
 
       # ==========================================================
-      # 22. CREATE REPORT
+      # 24. CREATE REPORT
       # ==========================================================
 
       - name: Create Test 16 report
@@ -1395,6 +1466,10 @@ jobs:
           VERIFIED
 
           AUDIO COVERAGE SCENES 1-4:
+          VERIFIED
+
+          SCENE MOTION:
+          ZOOM IN / ZOOM OUT / PAN LEFT / PAN RIGHT
           VERIFIED
 
           FINAL MP4:
