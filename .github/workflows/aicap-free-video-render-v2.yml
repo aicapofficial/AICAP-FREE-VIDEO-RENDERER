@@ -34,8 +34,8 @@ on:
         required: true
         type: string
 
-      manifest:
-        description: "AICAP render manifest JSON path"
+      config:
+        description: "Scene configuration JSON path"
         required: true
         type: string
 
@@ -65,7 +65,7 @@ jobs:
           SCRIPT_ID: ${{ inputs.script_id }}
           INPUT_ROOT: ${{ inputs.input_root }}
           OUTPUT_FILE: ${{ inputs.output_file }}
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
           echo "======================================"
@@ -90,7 +90,7 @@ jobs:
       - name: Load and validate AICAP manifest
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -188,7 +188,7 @@ jobs:
       - name: Validate manifest timeline
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -252,7 +252,7 @@ jobs:
       - name: Verify all AICAP input assets
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -291,7 +291,7 @@ jobs:
       - name: Verify narration audio
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -331,7 +331,7 @@ jobs:
       - name: Render all scenes
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -408,7 +408,7 @@ jobs:
       - name: Verify scene video durations
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -455,7 +455,7 @@ jobs:
       - name: Build exact video timeline
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -555,7 +555,7 @@ jobs:
       - name: Convert AICAP SRT subtitles to ASS
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
         run: |
           set -e
 
@@ -699,7 +699,7 @@ jobs:
       - name: Add continuous narration
         shell: bash
         env:
-          MANIFEST: ${{ inputs.manifest }}
+          MANIFEST: ${{ inputs.config }}
           OUTPUT_FILE: ${{ inputs.output_file }}
         run: |
           set -e
