@@ -1,0 +1,156 @@
+{
+  "project": {
+    "name": "AICAP_COMPLETE_ARTIFICIAL_RENDER_TEST",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 60
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP_COMPLETE_TEST_20260817_221533/narration.mp3",
+    "mode": "timeline_sync",
+    "segments": [
+      {
+        "id": 1,
+        "start": 0,
+        "duration": 10,
+        "end": 10
+      },
+      {
+        "id": 2,
+        "start": 10,
+        "duration": 15,
+        "end": 25
+      },
+      {
+        "id": 3,
+        "start": 25,
+        "duration": 15,
+        "end": 40
+      },
+      {
+        "id": 4,
+        "start": 40,
+        "duration": 20,
+        "end": 60
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP_COMPLETE_TEST_20260817_221533/scene_01.jpg",
+      "start": 0,
+      "duration": 10,
+      "end": 10,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "Artificial intelligence is\nchanging the world.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP_COMPLETE_TEST_20260817_221533/scene_02.jpg",
+      "start": 10,
+      "duration": 15,
+      "end": 25,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "Technology is transforming\nthe way we live.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP_COMPLETE_TEST_20260817_221533/scene_03.jpg",
+      "start": 25,
+      "duration": 15,
+      "end": 40,
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "text": "Creative ideas become\npowerful solutions.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 4,
+      "image": "aicap-render-jobs/AICAP_COMPLETE_TEST_20260817_221533/scene_04.jpg",
+      "start": 40,
+      "duration": 20,
+      "end": 60,
+      "motion": "pan_right",
+      "subtitle": {
+        "enabled": true,
+        "text": "Artificial intelligence opens\nnew possibilities.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    }
+  ]
+}
