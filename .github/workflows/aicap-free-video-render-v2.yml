@@ -234,7 +234,7 @@ jobs:
           echo "Render directories ready."
 
 
-      # ==========================================================
+            # ==========================================================
       # 07. VERIFY SCENE TIMELINE
       # ==========================================================
 
@@ -259,8 +259,6 @@ jobs:
             exit 1
           fi
 
-          EXPECTED_START="0"
-
           for INDEX in $(seq 0 $((COUNT - 1)))
           do
 
@@ -271,32 +269,28 @@ jobs:
 
             echo "Scene $ID : $START → $END"
 
-            CALCULATED_END=$(
-              python3 -c \
-              "print(round(float('$START') + float('$DURATION'), 3))"
-            )
-
-            python3 - "$END" "$CALCULATED_END" "$ID" <<'PY'
-            import sys
-
-            actual = float(sys.argv[1])
-            expected = float(sys.argv[2])
-            scene_id = sys.argv[3]
-
-            if abs(actual - expected) > 0.001:
-                print(f"ERROR: Scene {scene_id} end mismatch.")
-                print(f"Expected : {expected}")
-                print(f"Actual   : {actual}")
-                sys.exit(1)
-
-            print(f"Scene {scene_id} timeline : VERIFIED")
-            PY
-            
-            EXPECTED_START="$END"
-
-          done
-
-          echo "SCENE TIMELINE : VALID"
+            CALCULATED_END=$(python3 -c "
+              start = float('$START')
+              duration = float('$DURATION')
+              print(start + duration)
+              ")
+              
+                          python3 -c "
+              actual = float('$END')
+              expected = float('$CALCULATED_END')
+              
+              if abs(actual - expected) > 0.001:
+                  print('ERROR: Scene $ID end mismatch.')
+                  print(f'Expected : {expected}')
+                  print(f'Actual   : {actual}')
+                  raise SystemExit(1)
+              
+              print('Scene $ID timeline : VERIFIED')
+              "
+              
+                        done
+              
+                        echo "SCENE TIMELINE : VALID"
 
 
       # ==========================================================
