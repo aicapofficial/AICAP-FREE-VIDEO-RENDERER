@@ -234,7 +234,7 @@ jobs:
           echo "Render directories ready."
 
 
-            # ==========================================================
+      # ==========================================================
       # 07. VERIFY SCENE TIMELINE
       # ==========================================================
 
@@ -269,29 +269,25 @@ jobs:
 
             echo "Scene $ID : $START → $END"
 
-            CALCULATED_END=$(python3 -c "
-              start = float('$START')
-              duration = float('$DURATION')
-              print(start + duration)
-              ")
-              
-                          python3 -c "
-              actual = float('$END')
-              expected = float('$CALCULATED_END')
-              
-              if abs(actual - expected) > 0.001:
-                  print('ERROR: Scene $ID end mismatch.')
-                  print(f'Expected : {expected}')
-                  print(f'Actual   : {actual}')
-                  raise SystemExit(1)
-              
-              print('Scene $ID timeline : VERIFIED')
-              "
-              
-                        done
-              
-                        echo "SCENE TIMELINE : VALID"
+            CALCULATED_END=$(awk -v start="$START" -v duration="$DURATION" 'BEGIN { printf "%.3f", start + duration }')
 
+            ACTUAL_END=$(awk -v end="$END" 'BEGIN { printf "%.3f", end }')
+
+            DIFFERENCE=$(awk -v actual="$ACTUAL_END" -v expected="$CALCULATED_END" 'BEGIN { d=actual-expected; if (d<0) d=-d; printf "%.3f", d }')
+
+            if awk -v difference="$DIFFERENCE" 'BEGIN { exit !(difference > 0.001) }'
+            then
+              echo "ERROR: Scene $ID end mismatch."
+              echo "Expected : $CALCULATED_END"
+              echo "Actual   : $ACTUAL_END"
+              exit 1
+            fi
+
+            echo "Scene $ID timeline : VERIFIED"
+
+          done
+
+          echo "SCENE TIMELINE : VALID"
 
       # ==========================================================
       # 08. VERIFY NARRATION TIMELINE
