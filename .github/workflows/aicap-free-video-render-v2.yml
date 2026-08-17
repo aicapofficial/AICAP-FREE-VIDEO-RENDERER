@@ -1,5 +1,7 @@
 name: AICAP FREE VIDEO RENDER
 
+run-name: AICAP Free Video | ${{ inputs.job_id }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -916,7 +918,7 @@ jobs:
       # 17. UPLOAD FINAL MP4 AS GITHUB ARTIFACT
       # ==========================================================
 
-      - name: Upload rendered MP4
+      - name: aicap-video-${{ inputs.job_id }}
 
         uses: actions/upload-artifact@v4
 
