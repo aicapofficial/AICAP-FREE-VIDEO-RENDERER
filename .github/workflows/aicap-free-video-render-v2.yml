@@ -276,13 +276,22 @@ jobs:
               "print(round(float('$START') + float('$DURATION'), 3))"
             )
 
-            if [ "$END" != "$CALCULATED_END" ]; then
-              echo "ERROR: Scene $ID end mismatch."
-              echo "Expected : $CALCULATED_END"
-              echo "Actual   : $END"
-              exit 1
-            fi
+            python3 - "$END" "$CALCULATED_END" "$ID" <<'PY'
+            import sys
 
+            actual = float(sys.argv[1])
+            expected = float(sys.argv[2])
+            scene_id = sys.argv[3]
+
+            if abs(actual - expected) > 0.001:
+                print(f"ERROR: Scene {scene_id} end mismatch.")
+                print(f"Expected : {expected}")
+                print(f"Actual   : {actual}")
+                sys.exit(1)
+
+            print(f"Scene {scene_id} timeline : VERIFIED")
+            PY
+            
             EXPECTED_START="$END"
 
           done
