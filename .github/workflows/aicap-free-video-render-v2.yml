@@ -1,0 +1,882 @@
+name: AICAP FREE VIDEO RENDER
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "AICAP Render Job ID"
+        required: true
+        type: string
+
+      video_id:
+        description: "AICAP Video ID"
+        required: true
+        type: string
+
+      script_id:
+        description: "AICAP Script ID"
+        required: false
+        type: string
+        default: ""
+
+      input_root:
+        description: "AICAP GitHub input directory"
+        required: true
+        type: string
+
+      output_file:
+        description: "Final MP4 file name"
+        required: true
+        type: string
+
+      manifest:
+        description: "AICAP render manifest JSON path"
+        required: true
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install FFmpeg jq and Python
+        shell: bash
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg jq python3
+          ffmpeg -version | head -n 1
+          jq --version
+          python3 --version
+
+      - name: Verify render parameters
+        shell: bash
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          VIDEO_ID: ${{ inputs.video_id }}
+          SCRIPT_ID: ${{ inputs.script_id }}
+          INPUT_ROOT: ${{ inputs.input_root }}
+          OUTPUT_FILE: ${{ inputs.output_file }}
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+          echo "======================================"
+          echo "AICAP FREE VIDEO RENDER"
+          echo "RENDER PARAMETERS"
+          echo "======================================"
+          echo "Job ID      : $JOB_ID"
+          echo "Video ID    : $VIDEO_ID"
+          echo "Script ID   : $SCRIPT_ID"
+          echo "Input Root  : $INPUT_ROOT"
+          echo "Output File : $OUTPUT_FILE"
+          echo "Manifest    : $MANIFEST"
+
+          [ -n "$JOB_ID" ] || { echo "ERROR: job_id missing."; exit 1; }
+          [ -n "$VIDEO_ID" ] || { echo "ERROR: video_id missing."; exit 1; }
+          [ -n "$INPUT_ROOT" ] || { echo "ERROR: input_root missing."; exit 1; }
+          [ -n "$OUTPUT_FILE" ] || { echo "ERROR: output_file missing."; exit 1; }
+          [ -n "$MANIFEST" ] || { echo "ERROR: manifest missing."; exit 1; }
+
+          echo "PARAMETERS : VERIFIED"
+
+      - name: Load and validate AICAP manifest
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "LOADING AICAP RENDER MANIFEST"
+          echo "======================================"
+
+          if [ ! -f "$MANIFEST" ]; then
+            echo "ERROR: Manifest file not found:"
+            echo "$MANIFEST"
+            exit 1
+          fi
+
+          jq empty "$MANIFEST"
+
+          SCHEMA=$(jq -r '.schema // empty' "$MANIFEST")
+          SCHEMA_VERSION=$(jq -r '.schemaVersion // empty' "$MANIFEST")
+          WIDTH=$(jq -r '.output.width // empty' "$MANIFEST")
+          HEIGHT=$(jq -r '.output.height // empty' "$MANIFEST")
+          FPS=$(jq -r '.output.fps // empty' "$MANIFEST")
+          TARGET_DURATION=$(jq -r '.totalDuration // empty' "$MANIFEST")
+          TRANSITION=$(jq -r '.transition // "fade"' "$MANIFEST")
+          AUDIO=$(jq -r '.audio.file // empty' "$MANIFEST")
+          SUBTITLES=$(jq -r '.subtitles.file // empty' "$MANIFEST")
+          SCENE_COUNT=$(jq '.scenes | length' "$MANIFEST")
+
+          echo "Schema              : $SCHEMA"
+          echo "Schema Version      : $SCHEMA_VERSION"
+          echo "Resolution          : ${WIDTH}x${HEIGHT}"
+          echo "FPS                 : $FPS"
+          echo "Target Duration     : ${TARGET_DURATION}s"
+          echo "Transition           : $TRANSITION"
+          echo "Audio               : $AUDIO"
+          echo "Subtitles           : $SUBTITLES"
+          echo "Scene Count         : $SCENE_COUNT"
+
+          [ "$SCHEMA" = "AICAP_FREE_VIDEO_RENDER_MANIFEST" ] || {
+            echo "ERROR: Invalid AICAP manifest schema."
+            exit 1
+          }
+
+          [ "$SCHEMA_VERSION" = "1.0" ] || {
+            echo "ERROR: Unsupported AICAP manifest version."
+            exit 1
+          }
+
+          [ "$WIDTH" -eq 1080 ] || {
+            echo "ERROR: Width must be 1080."
+            exit 1
+          }
+
+          [ "$HEIGHT" -eq 1920 ] || {
+            echo "ERROR: Height must be 1920."
+            exit 1
+          }
+
+          [ "$FPS" -eq 30 ] || {
+            echo "ERROR: FPS must be 30."
+            exit 1
+          }
+
+          [ "$SCENE_COUNT" -ge 1 ] || {
+            echo "ERROR: No scenes found."
+            exit 1
+          }
+
+          [ -n "$AUDIO" ] || {
+            echo "ERROR: Manifest audio file is missing."
+            exit 1
+          }
+
+          [ -n "$SUBTITLES" ] || {
+            echo "ERROR: Manifest subtitle file is missing."
+            exit 1
+          }
+
+          if [ "$TRANSITION" != "fade" ]; then
+            echo "ERROR: Only fade transition is supported."
+            exit 1
+          fi
+
+          echo "MANIFEST : VALID"
+
+          {
+            echo "WIDTH=$WIDTH"
+            echo "HEIGHT=$HEIGHT"
+            echo "FPS=$FPS"
+            echo "TARGET_DURATION=$TARGET_DURATION"
+            echo "TRANSITION_TYPE=$TRANSITION"
+            echo "AUDIO_PATH=$AUDIO"
+            echo "SUBTITLE_PATH=$SUBTITLES"
+            echo "SCENE_COUNT=$SCENE_COUNT"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate manifest timeline
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          python3 - "$MANIFEST" "$TARGET_DURATION" <<'PY'
+          import json
+          import sys
+
+          path = sys.argv[1]
+          target = float(sys.argv[2])
+
+          with open(path, "r", encoding="utf-8") as f:
+              manifest = json.load(f)
+
+          scenes = manifest.get("scenes", [])
+          if not scenes:
+              raise SystemExit("ERROR: Manifest contains no scenes.")
+
+          cumulative = 0.0
+
+          for index, scene in enumerate(scenes, start=1):
+              duration = float(scene.get("duration", 0))
+              file_path = str(scene.get("file", "")).strip()
+
+              if duration <= 0:
+                  raise SystemExit(
+                      f"ERROR: Scene {index} duration must be positive."
+                  )
+
+              if not file_path:
+                  raise SystemExit(
+                      f"ERROR: Scene {index} image file is missing."
+                  )
+
+              print(
+                  f"Scene {index}: "
+                  f"start={cumulative:g}s "
+                  f"duration={duration:g}s "
+                  f"end={cumulative + duration:g}s"
+              )
+
+              cumulative += duration
+
+          if abs(cumulative - target) > 0.01:
+              raise SystemExit(
+                  f"ERROR: Scene timeline {cumulative:g}s "
+                  f"does not equal target {target:g}s"
+              )
+
+          print("SCENE TIMELINE : VALID")
+          PY
+
+      - name: Prepare render directories
+        shell: bash
+        run: |
+          set -e
+          rm -rf work output
+          mkdir -p work output
+          echo "WORK DIRECTORY   : READY"
+          echo "OUTPUT DIRECTORY : READY"
+
+      - name: Verify all AICAP input assets
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "VERIFYING AICAP INPUT ASSETS"
+          echo "======================================"
+
+          jq -r '.scenes[].file' "$MANIFEST" | while IFS= read -r FILE; do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing scene image:"
+              echo "$FILE"
+              exit 1
+            fi
+            echo "FOUND: $FILE"
+          done
+
+          AUDIO=$(jq -r '.audio.file' "$MANIFEST")
+          SUBTITLES=$(jq -r '.subtitles.file' "$MANIFEST")
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "ERROR: Missing narration:"
+            echo "$AUDIO"
+            exit 1
+          fi
+
+          if [ ! -f "$SUBTITLES" ]; then
+            echo "ERROR: Missing subtitles:"
+            echo "$SUBTITLES"
+            exit 1
+          fi
+
+          echo "FOUND: $AUDIO"
+          echo "FOUND: $SUBTITLES"
+          echo "ALL INPUT ASSETS : VERIFIED"
+
+      - name: Verify narration audio
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          AUDIO=$(jq -r '.audio.file' "$MANIFEST")
+
+          AUDIO_DURATION=$(
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 \
+              "$AUDIO"
+          )
+
+          echo "Narration duration : ${AUDIO_DURATION}s"
+          echo "Timeline duration  : ${TARGET_DURATION}s"
+
+          python3 - "$AUDIO_DURATION" "$TARGET_DURATION" <<'PY'
+          import sys
+
+          duration = float(sys.argv[1])
+          target = float(sys.argv[2])
+
+          if duration <= 0:
+              raise SystemExit(
+                  "ERROR: Narration audio has invalid duration."
+              )
+
+          if duration < target - 0.30:
+              raise SystemExit(
+                  f"ERROR: Narration audio {duration}s is shorter "
+                  f"than target {target}s"
+              )
+
+          print("NARRATION AUDIO : VERIFIED")
+          PY
+
+      - name: Render all scenes
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "RENDERING AICAP SCENES"
+          echo "======================================"
+
+          COUNT=$(jq '.scenes | length' "$MANIFEST")
+
+          for INDEX in $(seq 0 $((COUNT - 1))); do
+            ID=$((INDEX + 1))
+            IMAGE=$(jq -r ".scenes[$INDEX].file" "$MANIFEST")
+            DURATION=$(jq -r ".scenes[$INDEX].duration" "$MANIFEST")
+            MOTION=$(jq -r ".scenes[$INDEX].motion // \"zoom_in\"" "$MANIFEST")
+
+            if [ "$INDEX" -lt $((COUNT - 1)) ]; then
+              RENDER_DURATION=$(python3 -c "print(float('$DURATION') + 1.0)")
+            else
+              RENDER_DURATION="$DURATION"
+            fi
+
+            OUTPUT="work/scene_${ID}.mp4"
+
+            echo "--------------------------------------"
+            echo "Scene           : $ID"
+            echo "Source          : $IMAGE"
+            echo "Timeline        : $DURATION"
+            echo "Render Duration : $RENDER_DURATION"
+            echo "Motion          : $MOTION"
+            echo "--------------------------------------"
+
+            case "$MOTION" in
+              zoom_in)
+                FILTER="scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(zoom+0.0015,1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p"
+                ;;
+              zoom_out)
+                FILTER="scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='if(eq(on,0),1.15,max(zoom-0.0015,1.0))':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p"
+                ;;
+              pan_left)
+                FILTER="scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='1.10':x='(iw-iw/zoom)*(1-on/(30*${RENDER_DURATION}))':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p"
+                ;;
+              pan_right)
+                FILTER="scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='1.10':x='(iw-iw/zoom)*(on/(30*${RENDER_DURATION}))':y='(ih-ih/zoom)/2':d=1:s=1080x1920:fps=30,format=yuv420p"
+                ;;
+              *)
+                echo "ERROR: Unsupported motion '$MOTION' in Scene $ID."
+                exit 1
+                ;;
+            esac
+
+            ffmpeg -y \
+              -loop 1 \
+              -framerate "$FPS" \
+              -i "$IMAGE" \
+              -t "$RENDER_DURATION" \
+              -vf "$FILTER" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r 30 \
+              -an \
+              "$OUTPUT"
+
+            [ -s "$OUTPUT" ] || {
+              echo "ERROR: Scene $ID rendering failed."
+              exit 1
+            }
+
+            echo "Scene $ID : RENDERED"
+          done
+
+          echo "ALL SCENES : RENDERED"
+
+      - name: Verify scene video durations
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          COUNT=$(jq '.scenes | length' "$MANIFEST")
+
+          for INDEX in $(seq 0 $((COUNT - 1))); do
+            ID=$((INDEX + 1))
+            EXPECTED=$(jq -r ".scenes[$INDEX].duration" "$MANIFEST")
+
+            if [ "$INDEX" -lt $((COUNT - 1)) ]; then
+              EXPECTED_RENDER=$(python3 -c "print(float('$EXPECTED') + 1.0)")
+            else
+              EXPECTED_RENDER="$EXPECTED"
+            fi
+
+            ACTUAL=$(
+              ffprobe \
+                -v error \
+                -show_entries format=duration \
+                -of default=noprint_wrappers=1:nokey=1 \
+                "work/scene_${ID}.mp4"
+            )
+
+            echo "Scene $ID"
+            echo "Expected render : ${EXPECTED_RENDER}s"
+            echo "Actual           : ${ACTUAL}s"
+
+            python3 - "$ACTUAL" "$EXPECTED_RENDER" <<'PY'
+          import sys
+
+          actual = float(sys.argv[1])
+          expected = float(sys.argv[2])
+
+          if abs(actual - expected) > 0.20:
+              raise SystemExit(
+                  f"ERROR: Scene duration mismatch: "
+                  f"{actual}s vs {expected}s"
+              )
+          PY
+          done
+
+          echo "SCENE DURATIONS : VERIFIED"
+
+      - name: Build exact video timeline
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "BUILDING EXACT AICAP VIDEO TIMELINE"
+          echo "======================================"
+
+          COUNT=$(jq '.scenes | length' "$MANIFEST")
+          INPUT_ARGS=()
+
+          for INDEX in $(seq 0 $((COUNT - 1))); do
+            ID=$((INDEX + 1))
+            INPUT_ARGS+=(-i "work/scene_${ID}.mp4")
+          done
+
+          if [ "$COUNT" -eq 1 ]; then
+            cp "work/scene_1.mp4" work/video_core.mp4
+          else
+            FILTER=""
+
+            for INDEX in $(seq 1 $((COUNT - 1))); do
+              PREVIOUS_INDEX=$((INDEX - 1))
+
+              if [ "$INDEX" -eq 1 ]; then
+                PREVIOUS_LABEL="[0:v]"
+              else
+                PREVIOUS_LABEL="[v${PREVIOUS_INDEX}]"
+              fi
+
+              CURRENT_START=$(
+                python3 - "$MANIFEST" "$INDEX" <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+          index = int(sys.argv[2])
+
+          start = sum(
+              float(scene["duration"])
+              for scene in manifest["scenes"][:index]
+          )
+
+          print(start)
+          PY
+              )
+
+              XFADE_OFFSET=$(python3 -c "print(float('$CURRENT_START') - 1.0)")
+
+              FILTER="${FILTER}${PREVIOUS_LABEL}[${INDEX}:v]xfade=transition=fade:duration=1:offset=${XFADE_OFFSET}[v${INDEX}];"
+            done
+
+            FINAL_LABEL="[v$((COUNT - 1))]"
+
+            ffmpeg -y \
+              "${INPUT_ARGS[@]}" \
+              -filter_complex "$FILTER" \
+              -map "$FINAL_LABEL" \
+              -c:v libx264 \
+              -preset veryfast \
+              -pix_fmt yuv420p \
+              -r 30 \
+              -an \
+              work/video_core.mp4
+          fi
+
+          [ -s work/video_core.mp4 ] || {
+            echo "ERROR: Core video was not created."
+            exit 1
+          }
+
+          CORE_DURATION=$(
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 \
+              work/video_core.mp4
+          )
+
+          echo "Core video duration : ${CORE_DURATION}s"
+          echo "Target duration     : ${TARGET_DURATION}s"
+
+          python3 - "$CORE_DURATION" "$TARGET_DURATION" <<'PY'
+          import sys
+
+          actual = float(sys.argv[1])
+          target = float(sys.argv[2])
+
+          if abs(actual - target) > 0.30:
+              raise SystemExit(
+                  f"ERROR: Core video duration {actual}s "
+                  f"does not match target {target}s"
+              )
+
+          print("TIMELINE : VERIFIED")
+          PY
+
+      - name: Convert AICAP SRT subtitles to ASS
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -e
+
+          SUBTITLES=$(jq -r '.subtitles.file' "$MANIFEST")
+
+          python3 - "$SUBTITLES" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1])
+          output = Path("work/subtitles.ass")
+
+          text = source.read_text(encoding="utf-8-sig")
+
+          blocks = re.split(r"\n\s*\n", text.strip())
+
+          def ass_time(value):
+              value = value.replace(",", ".").strip()
+              h, m, s = value.split(":")
+              seconds = float(s)
+              return f"{int(h)}:{int(m):02d}:{seconds:05.2f}"
+
+          lines = [
+              "[Script Info]",
+              "ScriptType: v4.00+",
+              "PlayResX: 1080",
+              "PlayResY: 1920",
+              "ScaledBorderAndShadow: yes",
+              "WrapStyle: 2",
+              "",
+              "[V4+ Styles]",
+              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+              "Default,Arial,80,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,5,3,2,90,90,100,1",
+              "",
+              "[Events]",
+              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+          ]
+
+          count = 0
+
+          for block in blocks:
+              rows = block.splitlines()
+
+              timing = next(
+                  (row for row in rows if "-->" in row),
+                  None
+              )
+
+              if not timing:
+                  continue
+
+              start_text, end_text = [
+                  part.strip().split()[0]
+                  for part in timing.split("-->")
+              ]
+
+              start = ass_time(start_text)
+              end = ass_time(end_text)
+
+              timing_index = rows.index(timing)
+              caption = "\\N".join(
+                  row.strip()
+                  for row in rows[timing_index + 1:]
+                  if row.strip()
+              )
+
+              caption = (
+                  caption
+                  .replace("{", r"\{")
+                  .replace("}", r"\}")
+              )
+
+              if not caption:
+                  continue
+
+              lines.append(
+                  f"Dialogue: 0,{start},{end},Default,,0,0,0,,"
+                  f"{{\\q2\\pos(540,1580)}}{caption}"
+              )
+
+              count += 1
+
+          if count == 0:
+              raise SystemExit("ERROR: No valid SRT subtitle events found.")
+
+          output.write_text(
+              "\n".join(lines) + "\n",
+              encoding="utf-8"
+          )
+
+          print(f"ASS subtitle events : {count}")
+          print("ASS SUBTITLES : GENERATED")
+          PY
+
+      - name: Verify ASS subtitles
+        shell: bash
+        run: |
+          set -e
+
+          COUNT=$(
+            grep -c '^Dialogue:' work/subtitles.ass || true
+          )
+
+          echo "Subtitle events : $COUNT"
+
+          if [ "$COUNT" -lt 1 ]; then
+            echo "ERROR: ASS subtitle events missing."
+            exit 1
+          fi
+
+          grep -q '\\pos(540,1580)' work/subtitles.ass || {
+            echo "ERROR: Subtitle position missing."
+            exit 1
+          }
+
+          echo "ASS FORMATTING : VERIFIED"
+
+      - name: Burn subtitles into video
+        shell: bash
+        run: |
+          set -e
+
+          ffmpeg -y \
+            -i work/video_core.mp4 \
+            -vf "ass=work/subtitles.ass" \
+            -c:v libx264 \
+            -preset veryfast \
+            -pix_fmt yuv420p \
+            -r 30 \
+            -an \
+            work/video_subtitled.mp4
+
+          [ -s work/video_subtitled.mp4 ] || {
+            echo "ERROR: Subtitle video was not created."
+            exit 1
+          }
+
+          echo "SUBTITLES : BURNED"
+
+      - name: Add continuous narration
+        shell: bash
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          OUTPUT_FILE: ${{ inputs.output_file }}
+        run: |
+          set -e
+
+          AUDIO=$(jq -r '.audio.file' "$MANIFEST")
+
+          echo "======================================"
+          echo "ADDING CONTINUOUS NARRATION"
+          echo "======================================"
+
+          ffmpeg -y \
+            -stream_loop -1 \
+            -i "$AUDIO" \
+            -i work/video_subtitled.mp4 \
+            -map 1:v:0 \
+            -map 0:a:0 \
+            -t "$TARGET_DURATION" \
+            -c:v copy \
+            -c:a aac \
+            -b:a 192k \
+            -ar 48000 \
+            -ac 2 \
+            -movflags +faststart \
+            "output/$OUTPUT_FILE"
+
+          [ -s "output/$OUTPUT_FILE" ] || {
+            echo "ERROR: Final MP4 was not created."
+            exit 1
+          }
+
+          echo "FINAL MP4 : CREATED"
+
+      - name: Validate final MP4
+        shell: bash
+        env:
+          OUTPUT_FILE: ${{ inputs.output_file }}
+        run: |
+          set -e
+
+          FINAL="output/$OUTPUT_FILE"
+
+          [ -f "$FINAL" ] || {
+            echo "ERROR: Final MP4 missing."
+            exit 1
+          }
+
+          SIZE=$(stat -c%s "$FINAL")
+
+          [ "$SIZE" -gt 0 ] || {
+            echo "ERROR: Final MP4 is empty."
+            exit 1
+          }
+
+          echo "File size : $SIZE bytes"
+
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            "$FINAL"
+
+          ffprobe \
+            -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt \
+            -of default=noprint_wrappers=1 \
+            "$FINAL"
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            "$FINAL"
+
+          VIDEO_DURATION=$(
+            ffprobe \
+              -v error \
+              -show_entries format=duration \
+              -of default=noprint_wrappers=1:nokey=1 \
+              "$FINAL"
+          )
+
+          python3 - "$VIDEO_DURATION" "$TARGET_DURATION" <<'PY'
+          import sys
+
+          actual = float(sys.argv[1])
+          target = float(sys.argv[2])
+
+          print(f"Final duration : {actual}s")
+          print(f"Target duration: {target}s")
+
+          if abs(actual - target) > 0.30:
+              raise SystemExit(
+                  f"ERROR: Final duration {actual}s differs "
+                  f"from target {target}s"
+              )
+
+          print("FINAL VIDEO : VALID")
+          PY
+
+      - name: Verify final audio
+        shell: bash
+        env:
+          OUTPUT_FILE: ${{ inputs.output_file }}
+        run: |
+          set -e
+
+          FINAL="output/$OUTPUT_FILE"
+
+          AUDIO_STREAMS=$(
+            ffprobe \
+              -v error \
+              -select_streams a \
+              -show_entries stream=index \
+              -of csv=p=0 \
+              "$FINAL" | wc -l
+          )
+
+          echo "Audio streams : $AUDIO_STREAMS"
+
+          if [ "$AUDIO_STREAMS" -lt 1 ]; then
+            echo "ERROR: Final video has no audio stream."
+            exit 1
+          fi
+
+          AUDIO_DURATION=$(
+            ffprobe \
+              -v error \
+              -select_streams a:0 \
+              -show_entries stream=duration \
+              -of default=noprint_wrappers=1:nokey=1 \
+              "$FINAL"
+          )
+
+          echo "Audio duration : ${AUDIO_DURATION}s"
+
+          python3 - "$AUDIO_DURATION" "$TARGET_DURATION" <<'PY'
+          import sys
+
+          actual = float(sys.argv[1])
+          target = float(sys.argv[2])
+
+          if actual < target - 0.30:
+              raise SystemExit(
+                  f"ERROR: Audio duration {actual}s is shorter "
+                  f"than target {target}s"
+              )
+
+          print("AUDIO : VERIFIED")
+          PY
+
+      - name: Render completion report
+        shell: bash
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          VIDEO_ID: ${{ inputs.video_id }}
+          SCRIPT_ID: ${{ inputs.script_id }}
+          OUTPUT_FILE: ${{ inputs.output_file }}
+        run: |
+          echo "======================================"
+          echo "AICAP FREE VIDEO RENDER"
+          echo "======================================"
+          echo "Job ID       : $JOB_ID"
+          echo "Video ID     : $VIDEO_ID"
+          echo "Script ID    : $SCRIPT_ID"
+          echo "Resolution   : ${WIDTH}x${HEIGHT}"
+          echo "FPS          : ${FPS}"
+          echo "Duration     : ${TARGET_DURATION}s"
+          echo "Transition   : ${TRANSITION_TYPE}"
+          echo "Subtitles    : VERIFIED"
+          echo "Audio        : VERIFIED"
+          echo "Timeline     : VERIFIED"
+          echo "Output       : output/$OUTPUT_FILE"
+          echo "======================================"
+          echo "AICAP RENDER : SUCCESS"
+          echo "======================================"
+
+      - name: Upload final MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aicap-video-${{ inputs.job_id }}
+          path: output/${{ inputs.output_file }}
+          if-no-files-found: error
+          retention-days: 7
