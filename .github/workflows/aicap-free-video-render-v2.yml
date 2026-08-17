@@ -29,6 +29,11 @@ on:
         required: true
         type: string
 
+      config:
+        description: "Scene configuration JSON path"
+        required: true
+        type: string
+
       manifest:
         description: "AICAP render manifest JSON path"
         required: true
