@@ -573,6 +573,26 @@ jobs:
           echo "BUILDING CORE VIDEO"
           echo "======================================"
 
+          echo "Scene Count : $COUNT"
+
+          if [ "$COUNT" -lt 1 ]; then
+            echo "ERROR: No scenes available."
+            exit 1
+          fi
+
+
+          # --------------------------------------------------------
+          # IMPORTANT:
+          # Do NOT use "-loop 1" for the still-image inputs.
+          #
+          # Each source JPEG is intentionally a finite single-frame
+          # input. zoompan creates the exact number of output frames
+          # required for each scene.
+          #
+          # "-loop 1" would make the source image infinite and can
+          # cause zoompan to generate an effectively endless stream.
+          # --------------------------------------------------------
+
           INPUT_ARGS=()
 
           for INDEX in $(seq 0 $((COUNT - 1)))
@@ -587,17 +607,33 @@ jobs:
 
             FILE_PATH="$IMAGE_PATH"
 
+            if [ ! -f "$FILE_PATH" ]; then
+              echo "ERROR: Scene file not found:"
+              echo "$FILE_PATH"
+              exit 1
+            fi
+
             INPUT_ARGS+=(
-              -loop
-              1
               -i
               "$FILE_PATH"
             )
 
+            echo "Input $((INDEX + 1)) : $FILE_PATH"
+
           done
 
 
+          # --------------------------------------------------------
+          # BUILD SCENE FILTERS
+          # --------------------------------------------------------
+
           FILTER=""
+
+          TRANSITION="0.5"
+          FPS="30"
+          WIDTH="1080"
+          HEIGHT="1920"
+
 
           for INDEX in $(seq 0 $((COUNT - 1)))
           do
@@ -606,42 +642,95 @@ jobs:
             DURATION=$(jq -r ".scenes[$INDEX].duration" "$CONFIG")
             MOTION=$(jq -r ".scenes[$INDEX].motion" "$CONFIG")
 
-            WIDTH=1080
-            HEIGHT=1920
+
+            if ! awk -v d="$DURATION" 'BEGIN { exit !(d > 0) }'
+            then
+              echo "ERROR: Invalid duration for scene $((INDEX + 1))."
+              echo "Duration : $DURATION"
+              exit 1
+            fi
+
+
+            # ------------------------------------------------------
+            # Extend every non-final scene by the transition duration.
+            #
+            # This gives xfade enough frames to overlap the next scene
+            # while keeping the final project duration equal to the
+            # configured scene timeline.
+            # ------------------------------------------------------
+
+            if [ "$INDEX" -lt $((COUNT - 1)) ]; then
+
+              RENDER_DURATION=$(awk \
+                -v d="$DURATION" \
+                -v t="$TRANSITION" \
+                'BEGIN { printf "%.6f", d + t }')
+
+            else
+
+              RENDER_DURATION=$(awk \
+                -v d="$DURATION" \
+                'BEGIN { printf "%.6f", d }')
+
+            fi
+
+
+            FRAMES=$(awk \
+              -v duration="$RENDER_DURATION" \
+              -v fps="$FPS" \
+              'BEGIN { printf "%d", (duration * fps) + 0.5 }')
+
+
+            if [ "$FRAMES" -lt 1 ]; then
+              echo "ERROR: Calculated frame count is invalid."
+              echo "Scene  : $((INDEX + 1))"
+              echo "Frames : $FRAMES"
+              exit 1
+            fi
+
+
+            echo ""
+            echo "Scene $((INDEX + 1))"
+            echo "  Start           : $START"
+            echo "  Duration        : $DURATION"
+            echo "  Render Duration : $RENDER_DURATION"
+            echo "  Frames          : $FRAMES"
+            echo "  Motion          : $MOTION"
+
 
             INPUT_LABEL="[$INDEX:v]"
             OUTPUT_LABEL="[s${INDEX}]"
-
-            FRAMES=$(awk \
-              -v duration="$DURATION" \
-              'BEGIN { printf "%d", duration * 30 }')
 
 
             case "$MOTION" in
 
               zoom_in)
 
-                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='min(zoom+0.0005,1.15)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=30${OUTPUT_LABEL};"
+                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='min(zoom+0.0005,1.15)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=${FPS}${OUTPUT_LABEL};"
 
                 ;;
+
 
               zoom_out)
 
-                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='if(lte(on,1),1.15,max(zoom-0.0005,1.0))':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=30${OUTPUT_LABEL};"
+                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='if(lte(on,1),1.15,max(zoom-0.0005,1.0))':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=${FPS}${OUTPUT_LABEL};"
 
                 ;;
+
 
               pan_left)
 
-                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='1.08':x='if(lte(on,1),0,max(0,x-1))':y='ih/2-(ih/zoom/2)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=30${OUTPUT_LABEL};"
+                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='1.08':x='if(lte(on,1),0,max(0,x-1))':y='ih/2-(ih/zoom/2)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=${FPS}${OUTPUT_LABEL};"
 
                 ;;
+
 
               pan_right)
 
-                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='1.08':x='if(lte(on,1),0,min(iw-iw/zoom,x+1))':y='ih/2-(ih/zoom/2)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=30${OUTPUT_LABEL};"
+                FILTER="${FILTER}${INPUT_LABEL}scale=${WIDTH}:${HEIGHT},zoompan=z='1.08':x='if(lte(on,1),0,min(iw-iw/zoom,x+1))':y='ih/2-(ih/zoom/2)':d=${FRAMES}:s=${WIDTH}x${HEIGHT}:fps=${FPS}${OUTPUT_LABEL};"
 
                 ;;
+
 
               *)
 
@@ -655,6 +744,15 @@ jobs:
           done
 
 
+          # --------------------------------------------------------
+          # CHAIN XFADE
+          #
+          # xfade offset is relative to the first input of each
+          # chained xfade. Because every non-final scene has a
+          # transition tail, the configured scene start values remain
+          # the correct offsets.
+          # --------------------------------------------------------
+
           for INDEX in $(seq 1 $((COUNT - 1)))
           do
 
@@ -666,17 +764,29 @@ jobs:
               PREVIOUS_LABEL="[s0]"
             fi
 
+
             CURRENT_LABEL="[s${INDEX}]"
 
             OUTPUT_LABEL="[v${INDEX}]"
 
+
             CURRENT_START=$(jq -r ".scenes[$INDEX].start" "$CONFIG")
+
 
             XFADE_OFFSET=$(awk \
               -v start="$CURRENT_START" \
-              'BEGIN { printf "%.3f", start - 0.5 }')
+              'BEGIN { printf "%.3f", start }')
 
-            FILTER="${FILTER}${PREVIOUS_LABEL}${CURRENT_LABEL}xfade=transition=fade:duration=0.5:offset=${XFADE_OFFSET}[v${INDEX}];"
+
+            echo ""
+            echo "XFADE $INDEX"
+            echo "  Previous : $PREVIOUS_LABEL"
+            echo "  Current  : $CURRENT_LABEL"
+            echo "  Offset   : $XFADE_OFFSET"
+            echo "  Duration : $TRANSITION"
+
+
+            FILTER="${FILTER}${PREVIOUS_LABEL}${CURRENT_LABEL}xfade=transition=fade:duration=${TRANSITION}:offset=${XFADE_OFFSET}${OUTPUT_LABEL};"
 
           done
 
@@ -692,7 +802,19 @@ jobs:
           fi
 
 
+          echo ""
+          echo "======================================"
+          echo "FINAL FFMPEG FILTER GRAPH"
+          echo "======================================"
+
+          echo "$FILTER"
+
+          echo "======================================"
+
+
+          echo ""
           echo "Running FFmpeg..."
+
 
           ffmpeg -y \
             "${INPUT_ARGS[@]}" \
@@ -711,7 +833,27 @@ jobs:
             exit 1
           fi
 
-          echo "CORE VIDEO : CREATED"
+
+          CORE_DURATION=$(ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
+            work/video_core.mp4)
+
+
+          CORE_SIZE=$(stat -c%s work/video_core.mp4)
+
+
+          echo ""
+          echo "======================================"
+          echo "CORE VIDEO CREATED"
+          echo "======================================"
+
+          echo "Duration : $CORE_DURATION seconds"
+          echo "Size     : $CORE_SIZE bytes"
+
+          echo "======================================"
+
 
 
       # ==========================================================
