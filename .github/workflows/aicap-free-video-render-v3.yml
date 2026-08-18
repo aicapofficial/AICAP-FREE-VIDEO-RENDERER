@@ -56,10 +56,10 @@ jobs:
 
 
       # ==========================================================
-      # 02. INSTALL TOOLS
+      # 02. VERIFY PREINSTALLED TOOLS
       # ==========================================================
 
-      - name: Install FFmpeg jq and Python
+      - name: Verify FFmpeg jq and Python
 
         shell: bash
 
@@ -72,16 +72,24 @@ jobs:
           echo "PRODUCTION RENDER ENGINE"
           echo "======================================"
 
-          sudo apt-get update
+          echo "Checking preinstalled runner tools..."
 
-          sudo apt-get install -y \
-            ffmpeg \
-            jq \
-            python3
+          command -v ffmpeg
+          command -v ffprobe
+          command -v jq
+          command -v python3
 
-          echo "FFmpeg : INSTALLED"
-          echo "jq     : INSTALLED"
-          echo "Python : INSTALLED"
+          echo "FFmpeg : AVAILABLE"
+          echo "ffprobe: AVAILABLE"
+          echo "jq     : AVAILABLE"
+          echo "Python : AVAILABLE"
+
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+          jq --version
+          python3 --version
+
+          echo "TOOLS : VERIFIED"
 
 
       # ==========================================================
