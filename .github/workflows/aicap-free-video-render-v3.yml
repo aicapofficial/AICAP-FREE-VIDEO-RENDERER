@@ -55,85 +55,85 @@ jobs:
         uses: actions/checkout@v6
 
 
-    # ==========================================================
-# 02. VERIFY / PREPARE RENDER TOOLS
-# ==========================================================
+      # ==========================================================
+      # 02. VERIFY / PREPARE RENDER TOOLS
+      # ==========================================================
 
-- name: Verify and prepare render tools
+      - name: Verify and prepare render tools
 
-  shell: bash
+        shell: bash
 
-  run: |
+        run: |
 
-    set -e
+          set -e
 
-    echo "======================================"
-    echo "AICAP FREE VIDEO RENDERER"
-    echo "RENDER TOOL CHECK"
-    echo "======================================"
+          echo "======================================"
+          echo "AICAP FREE VIDEO RENDERER"
+          echo "RENDER TOOL CHECK"
+          echo "======================================"
 
-    echo ""
-    echo "Checking Python..."
+          echo ""
+          echo "Checking Python..."
 
-    if command -v python3 >/dev/null 2>&1; then
-      echo "Python : AVAILABLE"
-      python3 --version
-    else
-      echo "ERROR: python3 is not available."
-      exit 1
-    fi
+          if command -v python3 >/dev/null 2>&1; then
+            echo "Python : AVAILABLE"
+            python3 --version
+          else
+            echo "ERROR: python3 is not available."
+            exit 1
+          fi
 
-    echo ""
-    echo "Checking jq..."
+          echo ""
+          echo "Checking jq..."
 
-    if command -v jq >/dev/null 2>&1; then
-      echo "jq : AVAILABLE"
-      jq --version
-    else
-      echo "ERROR: jq is not available."
-      exit 1
-    fi
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq : AVAILABLE"
+            jq --version
+          else
+            echo "ERROR: jq is not available."
+            exit 1
+          fi
 
-    echo ""
-    echo "Checking FFmpeg..."
+          echo ""
+          echo "Checking FFmpeg..."
 
-    if command -v ffmpeg >/dev/null 2>&1; then
+          if command -v ffmpeg >/dev/null 2>&1; then
 
-      echo "FFmpeg : ALREADY AVAILABLE"
-      ffmpeg -version | head -n 1
+            echo "FFmpeg : ALREADY AVAILABLE"
+            ffmpeg -version | head -n 1
 
-    else
+          else
 
-      echo "FFmpeg : NOT AVAILABLE"
-      echo "Installing FFmpeg only..."
+            echo "FFmpeg : NOT AVAILABLE"
+            echo "Installing FFmpeg only..."
 
-      sudo apt-get update
-      sudo apt-get install -y ffmpeg
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
 
-      echo "FFmpeg : INSTALLED"
-      ffmpeg -version | head -n 1
+            echo "FFmpeg : INSTALLED"
+            ffmpeg -version | head -n 1
 
-    fi
+          fi
 
-    echo ""
-    echo "Checking FFprobe..."
+          echo ""
+          echo "Checking FFprobe..."
 
-    if command -v ffprobe >/dev/null 2>&1; then
+          if command -v ffprobe >/dev/null 2>&1; then
 
-      echo "FFprobe : AVAILABLE"
-      ffprobe -version | head -n 1
+            echo "FFprobe : AVAILABLE"
+            ffprobe -version | head -n 1
 
-    else
+          else
 
-      echo "ERROR: ffprobe is not available."
-      exit 1
+            echo "ERROR: ffprobe is not available."
+            exit 1
 
-    fi
+          fi
 
-    echo ""
-    echo "======================================"
-    echo "RENDER TOOLS : READY"
-    echo "======================================"
+          echo ""
+          echo "======================================"
+          echo "RENDER TOOLS : READY"
+          echo "======================================"
 
     
       # ==========================================================
