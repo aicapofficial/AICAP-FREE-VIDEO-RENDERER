@@ -55,11 +55,11 @@ jobs:
         uses: actions/checkout@v6
 
 
-      # ==========================================================
-      # 02. VERIFY PREINSTALLED TOOLS
+           # ==========================================================
+      # 02. VERIFY / PREPARE RENDER TOOLS
       # ==========================================================
 
-      - name: Verify FFmpeg jq and Python
+      - name: Verify and prepare render tools
 
         shell: bash
 
@@ -69,28 +69,71 @@ jobs:
 
           echo "======================================"
           echo "AICAP FREE VIDEO RENDERER"
-          echo "PRODUCTION RENDER ENGINE"
+          echo "RENDER TOOL CHECK"
           echo "======================================"
 
-          echo "Checking preinstalled runner tools..."
+          echo ""
+          echo "Checking Python..."
+          
+          if command -v python3 >/dev/null 2>&1; then
+            echo "Python : AVAILABLE"
+            python3 --version
+          else
+            echo "ERROR: python3 is not available."
+            exit 1
+          fi
 
-          command -v ffmpeg
-          command -v ffprobe
-          command -v jq
-          command -v python3
+          echo ""
+          echo "Checking jq..."
 
-          echo "FFmpeg : AVAILABLE"
-          echo "ffprobe: AVAILABLE"
-          echo "jq     : AVAILABLE"
-          echo "Python : AVAILABLE"
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq : AVAILABLE"
+            jq --version
+          else
+            echo "ERROR: jq is not available."
+            exit 1
+          fi
 
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
-          jq --version
-          python3 --version
+          echo ""
+          echo "Checking FFmpeg..."
 
-          echo "TOOLS : VERIFIED"
+          if command -v ffmpeg >/dev/null 2>&1; then
 
+            echo "FFmpeg : ALREADY AVAILABLE"
+            ffmpeg -version | head -n 1
+
+          else
+
+            echo "FFmpeg : NOT AVAILABLE"
+            echo "Installing FFmpeg only..."
+
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+
+            echo "FFmpeg : INSTALLED"
+            ffmpeg -version | head -n 1
+
+          fi
+
+          echo ""
+          echo "Checking FFprobe..."
+
+          if command -v ffprobe >/dev/null 2>&1; then
+
+            echo "FFprobe : AVAILABLE"
+            ffprobe -version | head -n 1
+
+          else
+
+            echo "ERROR: ffprobe is not available."
+            exit 1
+
+          fi
+
+          echo ""
+          echo "======================================"
+          echo "RENDER TOOLS : READY"
+          echo "======================================"
 
       # ==========================================================
       # 03. VERIFY INPUT PARAMETERS
