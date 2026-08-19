@@ -1,0 +1,123 @@
+{
+  "project": {
+    "name": "AICAP-9de8e822a80344f88843",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 60
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP-9de8e822a80344f88843/narration.mp3",
+    "mode": "timeline_sync",
+    "segments": [
+      {
+        "id": 1,
+        "start": 0,
+        "duration": 20,
+        "end": 20
+      },
+      {
+        "id": 2,
+        "start": 20,
+        "duration": 20,
+        "end": 40
+      },
+      {
+        "id": 3,
+        "start": 40,
+        "duration": 20,
+        "end": 60
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP-9de8e822a80344f88843/scene_01.jpg",
+      "start": 0,
+      "duration": 20,
+      "end": 20,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "Artificial intelligence is\nchanging our future.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP-9de8e822a80344f88843/scene_02.jpg",
+      "start": 20,
+      "duration": 20,
+      "end": 40,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "AI is transforming the way\npeople work and learn.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP-9de8e822a80344f88843/scene_03.jpg",
+      "start": 40,
+      "duration": 20,
+      "end": 60,
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "text": "The future belongs to people\nwho learn to work with AI.",
+        "style": {
+          "font": "Arial",
+          "size": 84,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    }
+  ]
+}
