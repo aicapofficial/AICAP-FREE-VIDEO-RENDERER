@@ -16,10 +16,14 @@ jobs:
       - name: Checkout renderer
         uses: actions/checkout@v4
 
-      - name: Prepare FFmpeg
+      - name: Install FFmpeg
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
@@ -29,7 +33,7 @@ jobs:
         env:
           JOB_ID: ${{ inputs.job_id }}
         run: |
-          set -e
+          set -euo pipefail
           ROOT="aicap-render-jobs/${JOB_ID}"
           test -d "$ROOT"
           test -f "$ROOT/scene_config.json"
@@ -58,7 +62,6 @@ jobs:
           if not isinstance(scenes, list) or not scenes:
               raise SystemExit("scene_config.json contains no scenes")
 
-          # Validate the audio-driven timeline.
           prev_end = 0.0
           for i, s in enumerate(scenes, 1):
               start = float(s["start"])
@@ -73,11 +76,13 @@ jobs:
               prev_end = end
 
           for i, s in enumerate(scenes, 1):
-              fid = s.get("fileId") or s.get("imageFileId")
               filename = s.get("filename") or f"scene_{i:02d}.jpg"
               path = os.path.join(root, filename)
               if not os.path.isfile(path):
                   raise SystemExit(f"Missing scene image: {path}")
+
+          if not os.path.isfile(os.path.join(root, "narration.mp3")):
+              raise SystemExit("Missing narration.mp3")
 
           print(f"Validated {len(scenes)} audio-driven scenes")
           print(f"Timeline duration: {prev_end:.3f}s")
@@ -95,7 +100,11 @@ jobs:
           width = int(cfg.get("width", 1080))
           height = int(cfg.get("height", 1920))
 
-          def q(x): return shlex.quote(str(x))
+          if fps <= 0 or width <= 0 or height <= 0:
+              raise SystemExit("Invalid render configuration")
+
+          def q(x):
+              return shlex.quote(str(x))
 
           inputs = []
           filters = []
@@ -107,45 +116,46 @@ jobs:
               start = float(s["start"])
               end = float(s["end"])
               dur = end - start
+
               motion = s.get("motion", "")
               if motion not in ("zoom_in", "zoom_out", "pan_left", "pan_right"):
                   motion = ("zoom_in", "zoom_out", "pan_left", "pan_right")[i % 4]
 
-              # Slight continuous motion, but NEVER shorten or advance
-              # the scene boundary. Every clip is exactly its audio interval.
+              frames = max(1, int(round(dur * fps)))
+
               if motion == "zoom_in":
                   vf = (
                       f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
                       f"zoompan=z='min(zoom+0.0007,1.12)':"
                       f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      f"d={frames}:s={width}x{height}:fps={fps}"
                   )
               elif motion == "zoom_out":
                   vf = (
                       f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
-                      f"zoompan=z='if(lte(on,1),1.12,max(1.0,zoom-0.0007))':"
+                      f"zoompan=z='if(eq(on,0),1.12,max(1.0,zoom-0.0007))':"
                       f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      f"d={frames}:s={width}x{height}:fps={fps}"
                   )
               elif motion == "pan_left":
                   vf = (
                       f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
                       f"zoompan=z='1.08':"
-                      f"x='(iw-iw/zoom)*min(on/(max(1,{dur*fps:.6f})),1)':"
+                      f"x='(iw-iw/zoom)*min(on/{frames},1)':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      f"d={frames}:s={width}x{height}:fps={fps}"
                   )
               else:
                   vf = (
                       f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
                       f"zoompan=z='1.08':"
-                      f"x='(iw-iw/zoom)*(1-min(on/(max(1,{dur*fps:.6f})),1))':"
+                      f"x='(iw-iw/zoom)*(1-min(on/{frames},1))':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      f"d={frames}:s={width}x{height}:fps={fps}"
                   )
 
               inputs += ["-loop", "1", "-t", f"{dur:.6f}", "-i", image]
@@ -155,22 +165,30 @@ jobs:
               )
               concat_labels.append(f"[v{i}]")
 
+          total = float(scenes[-1]["end"])
           filters.append(
               "".join(concat_labels) +
               f"concat=n={len(scenes)}:v=1:a=0,"
-              f"trim=duration={float(scenes[-1]['end']):.6f},"
+              f"trim=duration={total:.6f},"
               f"setpts=PTS-STARTPTS[v]"
           )
 
-          cmd = ["ffmpeg", "-y"] + inputs
+          cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + inputs
           cmd += [
               "-i", os.path.join(root, "narration.mp3"),
               "-filter_complex", ";".join(filters),
-              "-map", "[v]", "-map", f"{len(scenes)}:a",
-              "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-              "-pix_fmt", "yuv420p", "-r", str(fps),
-              "-c:a", "aac", "-b:a", "192k",
-              "-shortest", "-movflags", "+faststart", OUT
+              "-map", "[v]",
+              "-map", f"{len(scenes)}:a",
+              "-c:v", "libx264",
+              "-preset", "medium",
+              "-crf", "20",
+              "-pix_fmt", "yuv420p",
+              "-r", str(fps),
+              "-c:a", "aac",
+              "-b:a", "192k",
+              "-t", f"{total:.6f}",
+              "-movflags", "+faststart",
+              OUT
           ]
 
           print(" ".join(q(x) for x in cmd))
@@ -179,7 +197,7 @@ jobs:
           chmod +x /tmp/render.sh
           /tmp/render.sh | bash
 
-          test -f "$OUT"
+          test -s "$OUT"
 
       - name: Verify output
         shell: bash
@@ -189,25 +207,26 @@ jobs:
           set -euo pipefail
           OUT="$ROOT/aicap_final.mp4"
 
-          ffprobe -v error \
-            -select_streams v:0 \
-            -show_entries stream=width,height,r_frame_rate \
-            -of default=noprint_wrappers=1 "$OUT"
+          test -s "$OUT"
 
-          ffprobe -v error \
-            -select_streams a:0 \
-            -show_entries stream=codec_name \
-            -of default=noprint_wrappers=1 "$OUT"
+          ffprobe -v error             -select_streams v:0             -show_entries stream=width,height,r_frame_rate             -of default=noprint_wrappers=1 "$OUT"
 
-          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$OUT")" = "1080"
-          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$OUT")" = "1920"
+          ffprobe -v error             -select_streams a:0             -show_entries stream=codec_name             -of default=noprint_wrappers=1 "$OUT"
+
+          WIDTH="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$OUT")"
+          HEIGHT="$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$OUT")"
+          AUDIO_CODEC="$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "$OUT")"
+
+          test "$WIDTH" = "1080"
+          test "$HEIGHT" = "1920"
+          test "$AUDIO_CODEC" = "aac"
 
       - name: Package render artifact
         shell: bash
         env:
           ROOT: ${{ steps.locate.outputs.root }}
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p artifact
           cp "$ROOT/aicap_final.mp4" artifact/aicap_final.mp4
           cp "$ROOT/scene_config.json" artifact/scene_config.json
