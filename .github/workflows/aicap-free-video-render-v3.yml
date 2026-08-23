@@ -16,14 +16,15 @@ jobs:
       - name: Checkout renderer
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and fonts
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-liberation
           command -v ffmpeg
           command -v ffprobe
+          test -f /usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
@@ -74,9 +75,7 @@ jobs:
                   start = float(scene["start"])
                   end = float(scene["end"])
               except (KeyError, TypeError, ValueError) as exc:
-                  raise SystemExit(
-                      f"Invalid timing in scene {i}: {exc}"
-                  )
+                  raise SystemExit(f"Invalid timing in scene {i}: {exc}")
 
               if start < 0:
                   raise SystemExit(f"Invalid scene {i}: start < 0")
@@ -96,10 +95,20 @@ jobs:
               if not os.path.isfile(path):
                   raise SystemExit(f"Missing scene image: {path}")
 
+              subtitle = scene.get("subtitle") or {}
+
+              if subtitle.get("enabled"):
+                  text = str(subtitle.get("text", "")).strip()
+                  if not text:
+                      raise SystemExit(
+                          f"Scene {i} has subtitles enabled but no subtitle text"
+                      )
+
               prev_end = end
 
           print(f"Validated {len(scenes)} audio-driven scenes")
           print(f"Timeline duration: {prev_end:.3f}s")
+          print("Subtitle metadata: VERIFIED")
           PY
 
       - name: Render video
@@ -142,6 +151,8 @@ jobs:
           inputs = []
           filters = []
           concat_labels = []
+
+          caption_font = "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
 
           for i, scene in enumerate(scenes):
               filename = scene.get("filename") or f"scene_{i + 1:02d}.jpg"
@@ -189,9 +200,7 @@ jobs:
                       f"z='min(zoom+0.0007,1.12)':"
                       f"x='iw/2-(iw/zoom/2)':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
-                      f"fps={fps}"
+                      f"d=1:s={width}x{height}:fps={fps}"
                   )
 
               elif motion == "zoom_out":
@@ -203,9 +212,7 @@ jobs:
                       f"z='if(lte(on,1),1.12,max(1.0,zoom-0.0007))':"
                       f"x='iw/2-(iw/zoom/2)':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
-                      f"fps={fps}"
+                      f"d=1:s={width}x{height}:fps={fps}"
                   )
 
               elif motion == "pan_left":
@@ -218,9 +225,7 @@ jobs:
                       f"x='(iw-iw/zoom)*"
                       f"min(on/max(1,{frames}),1)':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
-                      f"fps={fps}"
+                      f"d=1:s={width}x{height}:fps={fps}"
                   )
 
               else:
@@ -233,10 +238,50 @@ jobs:
                       f"x='(iw-iw/zoom)*(1-"
                       f"min(on/max(1,{frames}),1))':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
-                      f"fps={fps}"
+                      f"d=1:s={width}x{height}:fps={fps}"
                   )
+
+              subtitle = scene.get("subtitle") or {}
+
+              if subtitle.get("enabled"):
+                  text = str(subtitle.get("text", "")).replace("\r\n", "\n").replace("\r", "\n").strip()
+
+                  caption_file = f"/tmp/aicap_caption_{i + 1:02d}.txt"
+
+                  with open(caption_file, "w", encoding="utf-8") as f:
+                      f.write(text)
+
+                  style = subtitle.get("style") or {}
+
+                  fontsize = int(style.get("size", 80))
+                  outline = int(style.get("outline", 5))
+                  shadow = int(style.get("shadow", 3))
+                  margin = int(style.get("margin", 90))
+
+                  # IMPORTANT:
+                  # y is calculated from the rendered multiline text height.
+                  # This prevents 5-6 line captions from extending below the
+                  # 1920px frame, which was the previous caption-placement bug.
+                  bottom_margin = max(100, margin + 30)
+
+                  drawtext = (
+                      f"drawtext="
+                      f"fontfile={q(caption_font)}:"
+                      f"textfile={q(caption_file)}:"
+                      f"fontcolor=white:"
+                      f"fontsize={fontsize}:"
+                      f"x='(w-text_w)/2':"
+                      f"y='h-text_h-{bottom_margin}':"
+                      f"line_spacing=10:"
+                      f"borderw={outline}:"
+                      f"bordercolor=black@0.85:"
+                      f"shadowx={shadow}:"
+                      f"shadowy={shadow}:"
+                      f"shadowcolor=black@0.80:"
+                      f"fix_bounds=1"
+                  )
+
+                  vf += "," + drawtext
 
               filters.append(
                   f"[{i}:v]{vf},"
@@ -247,6 +292,7 @@ jobs:
               concat_labels.append(f"[v{i}]")
 
           total_duration = float(scenes[-1]["end"])
+          audio_input_index = len(scenes)
 
           filters.append(
               "".join(concat_labels)
@@ -254,8 +300,6 @@ jobs:
               + f"trim=duration={total_duration:.6f},"
               + "setpts=PTS-STARTPTS[v]"
           )
-
-          audio_input_index = len(scenes)
 
           cmd = ["ffmpeg", "-y"] + inputs
 
@@ -340,8 +384,6 @@ jobs:
           video = float(sys.argv[1])
           audio = float(sys.argv[2])
 
-          # The renderer is audio-driven. Allow only a small encoder/container
-          # tolerance; do not silently accept a materially shortened video.
           if video < audio - 0.20:
               raise SystemExit(
                   f"Rendered video is shorter than audio: "
