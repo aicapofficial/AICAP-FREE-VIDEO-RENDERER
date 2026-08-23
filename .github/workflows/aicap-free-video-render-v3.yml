@@ -34,11 +34,73 @@ jobs:
           JOB_ID: ${{ inputs.job_id }}
         run: |
           set -euo pipefail
+
           ROOT="aicap-render-jobs/${JOB_ID}"
+
           test -d "$ROOT"
           test -f "$ROOT/scene_config.json"
           test -f "$ROOT/narration.mp3"
+
           echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Validate render package
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          CFG="$ROOT/scene_config.json"
+
+          python3 - "$CFG" "$ROOT" <<'PY'
+          import json
+          import os
+          import sys
+
+          cfg_path, root = sys.argv[1], sys.argv[2]
+
+          with open(cfg_path, "r", encoding="utf-8") as f:
+              cfg = json.load(f)
+
+          scenes = cfg.get("scenes")
+
+          if not isinstance(scenes, list) or not scenes:
+              raise SystemExit("scene_config.json contains no scenes")
+
+          prev_end = 0.0
+
+          for i, scene in enumerate(scenes, 1):
+              try:
+                  start = float(scene["start"])
+                  end = float(scene["end"])
+              except (KeyError, TypeError, ValueError) as exc:
+                  raise SystemExit(
+                      f"Invalid timing in scene {i}: {exc}"
+                  )
+
+              if start < 0:
+                  raise SystemExit(f"Invalid scene {i}: start < 0")
+
+              if end <= start:
+                  raise SystemExit(f"Invalid scene {i}: end <= start")
+
+              if abs(start - prev_end) > 0.001:
+                  raise SystemExit(
+                      f"Timeline gap/overlap before scene {i}: "
+                      f"{start} != {prev_end}"
+                  )
+
+              filename = scene.get("filename") or f"scene_{i:02d}.jpg"
+              path = os.path.join(root, filename)
+
+              if not os.path.isfile(path):
+                  raise SystemExit(f"Missing scene image: {path}")
+
+              prev_end = end
+
+          print(f"Validated {len(scenes)} audio-driven scenes")
+          print(f"Timeline duration: {prev_end:.3f}s")
+          PY
 
       - name: Render video
         shell: bash
@@ -51,134 +113,157 @@ jobs:
           AUDIO="$ROOT/narration.mp3"
           OUT="$ROOT/aicap_final.mp4"
 
-          python3 - "$CFG" "$ROOT" <<'PY'
-          import json, sys, os
+          python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" > /tmp/render.sh <<'PY'
+          import json
+          import os
+          import shlex
+          import sys
 
-          cfg_path, root = sys.argv[1], sys.argv[2]
-          with open(cfg_path, "r", encoding="utf-8") as f:
-              cfg = json.load(f)
+          cfg_path, root, audio, out = sys.argv[1:5]
 
-          scenes = cfg.get("scenes")
-          if not isinstance(scenes, list) or not scenes:
-              raise SystemExit("scene_config.json contains no scenes")
-
-          prev_end = 0.0
-          for i, s in enumerate(scenes, 1):
-              start = float(s["start"])
-              end = float(s["end"])
-              if end <= start:
-                  raise SystemExit(f"Invalid scene {i}: end <= start")
-              if abs(start - prev_end) > 0.001:
-                  raise SystemExit(
-                      f"Timeline gap/overlap before scene {i}: "
-                      f"{start} != {prev_end}"
-                  )
-              prev_end = end
-
-          for i, s in enumerate(scenes, 1):
-              filename = s.get("filename") or f"scene_{i:02d}.jpg"
-              path = os.path.join(root, filename)
-              if not os.path.isfile(path):
-                  raise SystemExit(f"Missing scene image: {path}")
-
-          if not os.path.isfile(os.path.join(root, "narration.mp3")):
-              raise SystemExit("Missing narration.mp3")
-
-          print(f"Validated {len(scenes)} audio-driven scenes")
-          print(f"Timeline duration: {prev_end:.3f}s")
-          PY
-
-          python3 - "$CFG" "$ROOT" > /tmp/render.sh <<'PY'
-          import json, sys, os, shlex
-
-          cfg_path, root = sys.argv[1], sys.argv[2]
           with open(cfg_path, "r", encoding="utf-8") as f:
               cfg = json.load(f)
 
           scenes = cfg["scenes"]
+
           fps = int(cfg.get("fps", 30))
           width = int(cfg.get("width", 1080))
           height = int(cfg.get("height", 1920))
 
-          if fps <= 0 or width <= 0 or height <= 0:
-              raise SystemExit("Invalid render configuration")
+          if fps <= 0:
+              raise SystemExit("Invalid FPS")
 
-          def q(x):
-              return shlex.quote(str(x))
+          if width <= 0 or height <= 0:
+              raise SystemExit("Invalid output dimensions")
+
+          def q(value):
+              return shlex.quote(str(value))
 
           inputs = []
           filters = []
           concat_labels = []
 
-          for i, s in enumerate(scenes):
-              filename = s.get("filename") or f"scene_{i+1:02d}.jpg"
+          for i, scene in enumerate(scenes):
+              filename = scene.get("filename") or f"scene_{i + 1:02d}.jpg"
               image = os.path.join(root, filename)
-              start = float(s["start"])
-              end = float(s["end"])
+
+              start = float(scene["start"])
+              end = float(scene["end"])
               dur = end - start
 
-              motion = s.get("motion", "")
-              if motion not in ("zoom_in", "zoom_out", "pan_left", "pan_right"):
-                  motion = ("zoom_in", "zoom_out", "pan_left", "pan_right")[i % 4]
+              if dur <= 0:
+                  raise SystemExit(
+                      f"Invalid duration for scene {i + 1}: {dur}"
+                  )
+
+              motion = scene.get("motion", "")
+
+              if motion not in (
+                  "zoom_in",
+                  "zoom_out",
+                  "pan_left",
+                  "pan_right",
+              ):
+                  motion = (
+                      "zoom_in",
+                      "zoom_out",
+                      "pan_left",
+                      "pan_right",
+                  )[i % 4]
 
               frames = max(1, int(round(dur * fps)))
 
+              inputs += [
+                  "-loop", "1",
+                  "-framerate", str(fps),
+                  "-t", f"{dur:.6f}",
+                  "-i", image,
+              ]
+
               if motion == "zoom_in":
                   vf = (
-                      f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
+                      f"scale={width*2}:{height*2}:"
+                      f"force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
-                      f"zoompan=z='min(zoom+0.0007,1.12)':"
-                      f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:s={width}x{height}:fps={fps}"
+                      f"zoompan="
+                      f"z='min(zoom+0.0007,1.12)':"
+                      f"x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
+
               elif motion == "zoom_out":
                   vf = (
-                      f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
+                      f"scale={width*2}:{height*2}:"
+                      f"force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
-                      f"zoompan=z='if(eq(on,0),1.12,max(1.0,zoom-0.0007))':"
-                      f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:s={width}x{height}:fps={fps}"
+                      f"zoompan="
+                      f"z='if(lte(on,1),1.12,max(1.0,zoom-0.0007))':"
+                      f"x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
+
               elif motion == "pan_left":
                   vf = (
-                      f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
+                      f"scale={width*2}:{height*2}:"
+                      f"force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
-                      f"zoompan=z='1.08':"
-                      f"x='(iw-iw/zoom)*min(on/{frames},1)':"
+                      f"zoompan="
+                      f"z='1.08':"
+                      f"x='(iw-iw/zoom)*"
+                      f"min(on/max(1,{frames}),1)':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:s={width}x{height}:fps={fps}"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
+
               else:
                   vf = (
-                      f"scale={width*2}:{height*2}:force_original_aspect_ratio=increase,"
+                      f"scale={width*2}:{height*2}:"
+                      f"force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
-                      f"zoompan=z='1.08':"
-                      f"x='(iw-iw/zoom)*(1-min(on/{frames},1))':"
+                      f"zoompan="
+                      f"z='1.08':"
+                      f"x='(iw-iw/zoom)*(1-"
+                      f"min(on/max(1,{frames}),1))':"
                       f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:s={width}x{height}:fps={fps}"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
 
-              inputs += ["-loop", "1", "-t", f"{dur:.6f}", "-i", image]
               filters.append(
-                  f"[{i}:v]{vf},trim=duration={dur:.6f},"
+                  f"[{i}:v]{vf},"
+                  f"trim=duration={dur:.6f},"
                   f"setpts=PTS-STARTPTS[v{i}]"
               )
+
               concat_labels.append(f"[v{i}]")
 
-          total = float(scenes[-1]["end"])
+          total_duration = float(scenes[-1]["end"])
+
           filters.append(
-              "".join(concat_labels) +
-              f"concat=n={len(scenes)}:v=1:a=0,"
-              f"trim=duration={total:.6f},"
-              f"setpts=PTS-STARTPTS[v]"
+              "".join(concat_labels)
+              + f"concat=n={len(scenes)}:v=1:a=0,"
+              + f"trim=duration={total_duration:.6f},"
+              + "setpts=PTS-STARTPTS[v]"
           )
 
-          cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + inputs
+          audio_input_index = len(scenes)
+
+          cmd = ["ffmpeg", "-y"] + inputs
+
           cmd += [
-              "-i", os.path.join(root, "narration.mp3"),
+              "-i", audio,
               "-filter_complex", ";".join(filters),
               "-map", "[v]",
-              "-map", f"{len(scenes)}:a",
+              "-map", f"{audio_input_index}:a",
               "-c:v", "libx264",
               "-preset", "medium",
               "-crf", "20",
@@ -186,12 +271,14 @@ jobs:
               "-r", str(fps),
               "-c:a", "aac",
               "-b:a", "192k",
-              "-t", f"{total:.6f}",
+              "-t", f"{total_duration:.6f}",
+              "-af", "aresample=async=1:first_pts=0",
               "-movflags", "+faststart",
-              OUT
+              out,
           ]
 
-          print(" ".join(q(x) for x in cmd))
+          print("set -euo pipefail")
+          print(" ".join(q(value) for value in cmd))
           PY
 
           chmod +x /tmp/render.sh
@@ -205,21 +292,67 @@ jobs:
           ROOT: ${{ steps.locate.outputs.root }}
         run: |
           set -euo pipefail
+
           OUT="$ROOT/aicap_final.mp4"
 
           test -s "$OUT"
 
-          ffprobe -v error             -select_streams v:0             -show_entries stream=width,height,r_frame_rate             -of default=noprint_wrappers=1 "$OUT"
+          echo "===== VIDEO STREAM ====="
+          ffprobe -v error \
+            -select_streams v:0 \
+            -show_entries stream=codec_name,width,height,r_frame_rate,duration \
+            -of default=noprint_wrappers=1 \
+            "$OUT"
 
-          ffprobe -v error             -select_streams a:0             -show_entries stream=codec_name             -of default=noprint_wrappers=1 "$OUT"
+          echo "===== AUDIO STREAM ====="
+          ffprobe -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels,duration \
+            -of default=noprint_wrappers=1 \
+            "$OUT"
 
-          WIDTH="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$OUT")"
-          HEIGHT="$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$OUT")"
-          AUDIO_CODEC="$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "$OUT")"
+          WIDTH="$(ffprobe -v error \
+            -select_streams v:0 \
+            -show_entries stream=width \
+            -of csv=p=0 "$OUT")"
+
+          HEIGHT="$(ffprobe -v error \
+            -select_streams v:0 \
+            -show_entries stream=height \
+            -of csv=p=0 "$OUT")"
 
           test "$WIDTH" = "1080"
           test "$HEIGHT" = "1920"
-          test "$AUDIO_CODEC" = "aac"
+
+          VIDEO_DURATION="$(ffprobe -v error \
+            -select_streams v:0 \
+            -show_entries stream=duration \
+            -of csv=p=0 "$OUT")"
+
+          AUDIO_DURATION="$(ffprobe -v error \
+            -select_streams a:0 \
+            -show_entries stream=duration \
+            -of csv=p=0 "$OUT")"
+
+          python3 - "$VIDEO_DURATION" "$AUDIO_DURATION" <<'PY'
+          import sys
+
+          video = float(sys.argv[1])
+          audio = float(sys.argv[2])
+
+          # The renderer is audio-driven. Allow only a small encoder/container
+          # tolerance; do not silently accept a materially shortened video.
+          if video < audio - 0.20:
+              raise SystemExit(
+                  f"Rendered video is shorter than audio: "
+                  f"video={video:.3f}s audio={audio:.3f}s"
+              )
+
+          print(
+              f"Duration verified: video={video:.3f}s "
+              f"audio={audio:.3f}s"
+          )
+          PY
 
       - name: Package render artifact
         shell: bash
@@ -227,11 +360,17 @@ jobs:
           ROOT: ${{ steps.locate.outputs.root }}
         run: |
           set -euo pipefail
+
           mkdir -p artifact
+
           cp "$ROOT/aicap_final.mp4" artifact/aicap_final.mp4
           cp "$ROOT/scene_config.json" artifact/scene_config.json
           cp "$ROOT/narration.mp3" artifact/narration.mp3
-          cp -R "$ROOT"/*.jpg artifact/ 2>/dev/null || true
+
+          find "$ROOT" -maxdepth 1 \
+            -type f \
+            \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" \) \
+            -exec cp {} artifact/ \;
 
       - name: Upload MP4 artifact
         uses: actions/upload-artifact@v4
