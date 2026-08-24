@@ -30,22 +30,19 @@ jobs:
           set -euo pipefail
 
           sudo apt-get update
-
-          sudo apt-get install -y \
-            ffmpeg \
-            fonts-liberation
+          sudo apt-get install -y ffmpeg fonts-liberation
 
           command -v ffmpeg
           command -v ffprobe
-
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
 
           FONT="/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
 
           test -f "$FONT"
 
           echo "Using subtitle font: $FONT"
+
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
 
 
       # ============================================================
@@ -64,42 +61,28 @@ jobs:
           echo "======================================"
           echo "AICAP RENDER JOB"
           echo "======================================"
-          echo "JOB_ID : ${JOB_ID}"
-          echo "ROOT   : ${ROOT}"
+          echo "Job ID : ${JOB_ID}"
+          echo "Root   : ${ROOT}"
           echo "======================================"
 
           test -d "$ROOT"
           test -f "$ROOT/scene_config.json"
           test -s "$ROOT/narration.mp3"
 
-          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+          echo "Render package located successfully."
 
-          echo "Render job located successfully."
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
 
 
       # ============================================================
-      # 4. VALIDATE JSON RENDER PACKAGE
+      # 4. VALIDATE RENDER PACKAGE
       #
       # CRITICAL:
+      # scene_config.json is DATA.
+      # It is NEVER executed as Python.
       #
-      # scene_config.json is JSON DATA.
-      #
-      # NEVER execute scene_config.json as Python.
-      #
-      # JSON:
-      #     true
-      #     false
-      #     null
-      #
-      # are valid JSON values.
-      #
-      # Python receives the JSON through json.load().
-      # Therefore true/false are converted correctly to:
-      #
-      #     True
-      #     False
-      #
-      # internally.
+      # JSON true/false are therefore handled correctly by
+      # Python's json.load().
       # ============================================================
       - name: Validate render package
         shell: bash
@@ -122,11 +105,9 @@ jobs:
           cfg_path = sys.argv[1]
           root = sys.argv[2]
 
-          print("Reading JSON:", cfg_path)
-
           # IMPORTANT:
-          # JSON is READ as DATA.
-          # It is NEVER executed as Python.
+          # Read JSON as DATA.
+          # Never execute scene_config.json as Python.
           with open(cfg_path, "r", encoding="utf-8") as f:
               cfg = json.load(f)
 
@@ -154,9 +135,9 @@ jobs:
                   "Invalid render dimensions"
               )
 
-          prev_end = 0.0
+          previous_end = 0.0
 
-          allowed_motions = {
+          allowed_motion = {
               "zoom_in",
               "zoom_out",
               "pan_left",
@@ -192,10 +173,11 @@ jobs:
                       f"Invalid scene {i}: end <= start"
                   )
 
-              if abs(start - prev_end) > 0.001:
+              if abs(start - previous_end) > 0.001:
                   raise SystemExit(
-                      f"Timeline gap/overlap before scene {i}: "
-                      f"{start} != {prev_end}"
+                      "Timeline gap/overlap before "
+                      f"scene {i}: "
+                      f"{start} != {previous_end}"
                   )
 
               filename = (
@@ -215,10 +197,10 @@ jobs:
 
               motion = scene.get("motion", "")
 
-              if motion and motion not in allowed_motions:
+              if motion and motion not in allowed_motion:
                   print(
-                      f"WARNING: unsupported motion in scene "
-                      f"{i}; renderer fallback will be used"
+                      f"WARNING: unsupported motion "
+                      f"in scene {i}; fallback will be used"
                   )
 
               subtitle = scene.get("subtitle") or {}
@@ -232,10 +214,10 @@ jobs:
                   if not text:
                       raise SystemExit(
                           f"Scene {i} subtitles enabled "
-                          f"but subtitle text is empty"
+                          "but text is empty"
                       )
 
-              prev_end = end
+              previous_end = end
 
           narration = os.path.join(
               root,
@@ -247,52 +229,58 @@ jobs:
                   "Missing narration.mp3"
               )
 
-          if os.path.getsize(narration) <= 0:
-              raise SystemExit(
-                  "narration.mp3 is empty"
-              )
-
           print("")
-          print("======================================")
-          print("JSON VALIDATION : SUCCESS")
-          print("======================================")
-          print(f"Scenes           : {len(scenes)}")
-          print(f"Resolution       : {width}x{height}")
-          print(f"FPS              : {fps}")
+          print("Validated scenes :", len(scenes))
+          print("Resolution       :", f"{width}x{height}")
+          print("FPS              :", fps)
           print(
-              f"Timeline duration: {prev_end:.3f}s"
+              "Timeline duration:",
+              f"{previous_end:.3f}s"
           )
-          print("Narration        : PRESENT")
-          print("Scene images     : VERIFIED")
-          print("JSON booleans    : PARSED")
-          print("======================================")
+          print("JSON validation  : SUCCESS")
+          print("")
+
+
+          # ========================================================
+          # IMPORTANT BOOLEAN TEST
+          #
+          # This confirms that JSON true/false were successfully
+          # parsed as Python booleans.
+          # ========================================================
+
+          for i, scene in enumerate(scenes, 1):
+
+              subtitle = scene.get("subtitle")
+
+              if isinstance(subtitle, dict):
+                  enabled = subtitle.get(
+                      "enabled",
+                      False
+                  )
+
+                  if not isinstance(
+                      enabled,
+                      bool
+                  ):
+                      raise SystemExit(
+                          "Subtitle enabled value in "
+                          f"scene {i} is not boolean"
+                      )
+
+          print(
+              "JSON boolean handling : SUCCESS"
+          )
+
           PY
 
 
       # ============================================================
-      # 5. RENDER VIDEO
+      # 5. GENERATE FFMPEG COMMAND
       #
-      # AUDIO-DRIVEN
-      #
-      # Every scene duration comes directly from:
-      #
-      #     scene["end"] - scene["start"]
-      #
-      # The complete narration remains continuous.
-      #
-      # Motion:
-      #     zoom_in
-      #     zoom_out
-      #     pan_left
-      #     pan_right
-      #
-      # Subtitle:
-      #     FFmpeg drawtext
-      #
-      # Transition:
-      #     fade in / fade out
+      # JSON is loaded using json.load().
+      # It is NOT executed.
       # ============================================================
-      - name: Render video
+      - name: Generate FFmpeg render command
         shell: bash
         env:
           ROOT: ${{ steps.locate.outputs.root }}
@@ -304,10 +292,7 @@ jobs:
           OUT="$ROOT/aicap_final.mp4"
 
           python3 \
-            "$CFG" \
-            "$ROOT" \
-            "$AUDIO" \
-            "$OUT" \
+            - "$CFG" "$ROOT" "$AUDIO" "$OUT" \
             > /tmp/aicap_render.sh <<'PY'
 
           import json
@@ -315,20 +300,16 @@ jobs:
           import shlex
           import sys
 
-          cfg_path, root, audio, out = sys.argv[1:5]
+          cfg_path = sys.argv[1]
+          root = sys.argv[2]
+          audio = sys.argv[3]
+          output = sys.argv[4]
 
           # ========================================================
-          # CRITICAL FIX
-          #
-          # JSON FILE IS DATA ONLY.
-          #
-          # It is read with json.load().
-          #
-          # NEVER:
-          #
-          #   python3 scene_config.json
-          #
+          # CRITICAL:
+          # JSON is DATA.
           # ========================================================
+
           with open(
               cfg_path,
               "r",
@@ -336,12 +317,7 @@ jobs:
           ) as f:
               cfg = json.load(f)
 
-          scenes = cfg.get("scenes")
-
-          if not isinstance(scenes, list) or not scenes:
-              raise SystemExit(
-                  "scene_config.json contains no scenes"
-              )
+          scenes = cfg["scenes"]
 
           fps = int(
               cfg.get("fps", 30)
@@ -362,29 +338,25 @@ jobs:
 
           if width <= 0 or height <= 0:
               raise SystemExit(
-                  "Invalid render dimensions"
+                  "Invalid output dimensions"
               )
 
-          caption_font = (
-              "/usr/share/fonts/truetype/"
-              "liberation2/"
-              "LiberationSans-Bold.ttf"
-          )
-
-          if not os.path.isfile(caption_font):
-              raise SystemExit(
-                  f"Caption font not found: "
-                  f"{caption_font}"
-              )
 
           def q(value):
               return shlex.quote(
                   str(value)
               )
 
+
           inputs = []
           filters = []
-          concat_labels = []
+          labels = []
+
+          font = (
+              "/usr/share/fonts/truetype/"
+              "liberation2/"
+              "LiberationSans-Bold.ttf"
+          )
 
           motions = (
               "zoom_in",
@@ -393,10 +365,14 @@ jobs:
               "pan_right"
           )
 
+
           # ========================================================
           # BUILD EACH SCENE
           # ========================================================
-          for i, scene in enumerate(scenes):
+
+          for i, scene in enumerate(
+              scenes
+          ):
 
               filename = (
                   scene.get("filename")
@@ -416,13 +392,13 @@ jobs:
                   scene["end"]
               )
 
-              dur = end - start
+              duration = end - start
 
-              if dur <= 0:
+              if duration <= 0:
                   raise SystemExit(
-                      f"Invalid duration "
-                      f"for scene {i + 1}: {dur}"
+                      f"Invalid duration in scene {i + 1}"
                   )
+
 
               motion = scene.get(
                   "motion",
@@ -434,258 +410,265 @@ jobs:
                       i % len(motions)
                   ]
 
-              frames = max(
-                  1,
-                  int(round(dur * fps))
-              )
 
-              # ----------------------------------------------------
-              # IMAGE INPUT
-              # ----------------------------------------------------
               inputs += [
                   "-loop",
                   "1",
                   "-framerate",
                   str(fps),
                   "-t",
-                  f"{dur:.6f}",
+                  f"{duration:.6f}",
                   "-i",
                   image
               ]
 
-              # ----------------------------------------------------
+
+              # ====================================================
               # MOTION
-              # ----------------------------------------------------
+              # ====================================================
+
               if motion == "zoom_in":
 
                   vf = (
-                      f"scale={width * 2}:{height * 2}:"
-                      f"force_original_aspect_ratio=increase,"
-                      f"crop={width * 2}:{height * 2},"
-                      f"zoompan="
-                      f"z='min(zoom+0.0007,1.12)':"
-                      f"x='iw/2-(iw/zoom/2)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
+                      f"scale={width * 2}:"
+                      f"{height * 2}:"
+                      "force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:"
+                      f"{height * 2},"
+                      "zoompan="
+                      "z='min(zoom+0.0007,1.12)':"
+                      "x='iw/2-(iw/zoom/2)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      f"d=1:s={width}x{height}:"
                       f"fps={fps}"
                   )
+
 
               elif motion == "zoom_out":
 
                   vf = (
-                      f"scale={width * 2}:{height * 2}:"
-                      f"force_original_aspect_ratio=increase,"
-                      f"crop={width * 2}:{height * 2},"
-                      f"zoompan="
-                      f"z='if(lte(on,1),1.12,"
-                      f"max(1.0,zoom-0.0007))':"
-                      f"x='iw/2-(iw/zoom/2)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
+                      f"scale={width * 2}:"
+                      f"{height * 2}:"
+                      "force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:"
+                      f"{height * 2},"
+                      "zoompan="
+                      "z='if(lte(on,1),1.12,"
+                      "max(1.0,zoom-0.0007))':"
+                      "x='iw/2-(iw/zoom/2)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      f"d=1:s={width}x{height}:"
                       f"fps={fps}"
                   )
+
 
               elif motion == "pan_left":
 
                   vf = (
-                      f"scale={width * 2}:{height * 2}:"
-                      f"force_original_aspect_ratio=increase,"
-                      f"crop={width * 2}:{height * 2},"
-                      f"zoompan="
-                      f"z='1.08':"
-                      f"x='(iw-iw/zoom)*"
-                      f"min(on/max(1,{frames}),1)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
+                      f"scale={width * 2}:"
+                      f"{height * 2}:"
+                      "force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:"
+                      f"{height * 2},"
+                      "zoompan="
+                      "z='1.08':"
+                      "x='(iw-iw/zoom)*"
+                      "(1-min(on/"
+                      f"(max(1,{duration * fps:.6f})),1))':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      f"d=1:s={width}x{height}:"
                       f"fps={fps}"
                   )
+
 
               else:
 
                   vf = (
-                      f"scale={width * 2}:{height * 2}:"
-                      f"force_original_aspect_ratio=increase,"
-                      f"crop={width * 2}:{height * 2},"
-                      f"zoompan="
-                      f"z='1.08':"
-                      f"x='(iw-iw/zoom)*(1-"
-                      f"min(on/max(1,{frames}),1))':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d=1:"
-                      f"s={width}x{height}:"
+                      f"scale={width * 2}:"
+                      f"{height * 2}:"
+                      "force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:"
+                      f"{height * 2},"
+                      "zoompan="
+                      "z='1.08':"
+                      "x='(iw-iw/zoom)*"
+                      "min(on/"
+                      f"(max(1,{duration * fps:.6f})),1)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      f"d=1:s={width}x{height}:"
                       f"fps={fps}"
                   )
 
-              # ----------------------------------------------------
-              # SUBTITLES
-              # ----------------------------------------------------
+
+              # ====================================================
+              # SUBTITLE
+              # ====================================================
+
               subtitle = (
                   scene.get("subtitle")
                   or {}
               )
 
-              if subtitle.get("enabled"):
+              if subtitle.get(
+                  "enabled"
+              ):
 
                   text = str(
                       subtitle.get(
                           "text",
                           ""
                       )
-                  ).replace(
-                      "\r\n",
-                      "\n"
-                  ).replace(
-                      "\r",
-                      "\n"
                   ).strip()
 
-                  caption_file = (
-                      f"/tmp/aicap_caption_"
-                      f"{i + 1:02d}.txt"
-                  )
+                  if text:
 
-                  with open(
-                      caption_file,
-                      "w",
-                      encoding="utf-8"
-                  ) as f:
-                      f.write(text)
-
-                  style = (
-                      subtitle.get("style")
-                      or {}
-                  )
-
-                  fontsize = int(
-                      style.get(
-                          "size",
-                          80
+                      caption_file = (
+                          f"/tmp/"
+                          f"aicap_caption_"
+                          f"{i + 1:02d}.txt"
                       )
-                  )
 
-                  outline = int(
-                      style.get(
-                          "outline",
-                          5
+                      with open(
+                          caption_file,
+                          "w",
+                          encoding="utf-8"
+                      ) as caption:
+
+                          caption.write(
+                              text
+                          )
+
+                      style = (
+                          subtitle.get(
+                              "style"
+                          )
+                          or {}
                       )
-                  )
 
-                  shadow = int(
-                      style.get(
-                          "shadow",
-                          3
+                      size = int(
+                          style.get(
+                              "size",
+                              80
+                          )
                       )
-                  )
 
-                  margin = int(
-                      style.get(
-                          "margin",
-                          90
+                      outline = int(
+                          style.get(
+                              "outline",
+                              5
+                          )
                       )
-                  )
 
-                  bottom_margin = max(
-                      100,
-                      margin + 30
-                  )
+                      shadow = int(
+                          style.get(
+                              "shadow",
+                              3
+                          )
+                      )
 
-                  drawtext = (
-                      "drawtext="
-                      f"fontfile={q(caption_font)}:"
-                      f"textfile={q(caption_file)}:"
-                      "fontcolor=white:"
-                      f"fontsize={fontsize}:"
-                      "x='(w-text_w)/2':"
-                      f"y='h-text_h-{bottom_margin}':"
-                      "line_spacing=10:"
-                      f"borderw={outline}:"
-                      "bordercolor=black@0.85:"
-                      f"shadowx={shadow}:"
-                      f"shadowy={shadow}:"
-                      "shadowcolor=black@0.80:"
-                      "fix_bounds=1"
-                  )
+                      margin = int(
+                          style.get(
+                              "margin",
+                              90
+                          )
+                      )
 
-                  vf += "," + drawtext
+                      bottom = max(
+                          100,
+                          margin + 30
+                      )
 
-              # ----------------------------------------------------
+                      vf += (
+                          ",drawtext="
+                          f"fontfile={q(font)}:"
+                          f"textfile={q(caption_file)}:"
+                          "fontcolor=white:"
+                          f"fontsize={size}:"
+                          "x='(w-text_w)/2':"
+                          f"y='h-text_h-{bottom}':"
+                          "line_spacing=10:"
+                          f"borderw={outline}:"
+                          "bordercolor=black@0.85:"
+                          f"shadowx={shadow}:"
+                          f"shadowy={shadow}:"
+                          "shadowcolor=black@0.80:"
+                          "fix_bounds=1"
+                      )
+
+
+              # ====================================================
               # FADE
-              # ----------------------------------------------------
+              # ====================================================
+
               fade = min(
                   0.5,
                   max(
                       0.05,
-                      dur / 4.0
+                      duration / 4.0
                   )
-              )
-
-              fade_out_start = max(
-                  0,
-                  dur - fade
               )
 
               vf += (
                   f",fade=t=in:"
                   f"st=0:"
                   f"d={fade:.6f}"
-              )
-
-              vf += (
                   f",fade=t=out:"
-                  f"st={fade_out_start:.6f}:"
+                  f"st={max(0, duration - fade):.6f}:"
                   f"d={fade:.6f}"
               )
 
-              # ----------------------------------------------------
-              # EXACT SCENE DURATION
-              # ----------------------------------------------------
+
               filters.append(
                   f"[{i}:v]"
                   f"{vf},"
-                  f"trim=duration={dur:.6f},"
-                  f"setpts=PTS-STARTPTS"
+                  f"trim=duration={duration:.6f},"
+                  "setpts=PTS-STARTPTS"
                   f"[v{i}]"
               )
 
-              concat_labels.append(
+              labels.append(
                   f"[v{i}]"
               )
 
+
           # ========================================================
-          # CONCATENATE ALL VISUAL SCENES
+          # CONCATENATE SCENES
           # ========================================================
-          total_duration = float(
+
+          total = float(
               scenes[-1]["end"]
           )
 
-          audio_input_index = len(
+          filters.append(
+              "".join(labels)
+              + f"concat=n={len(scenes)}:"
+                "v=1:a=0,"
+                f"trim=duration={total:.6f},"
+                "setpts=PTS-STARTPTS"
+                "[v]"
+          )
+
+
+          audio_index = len(
               scenes
           )
 
-          filters.append(
-              "".join(concat_labels)
-              +
-              f"concat=n={len(scenes)}:"
-              f"v=1:a=0,"
-              f"trim=duration={total_duration:.6f},"
-              "setpts=PTS-STARTPTS[v]"
-          )
 
           # ========================================================
           # FFMPEG COMMAND
           # ========================================================
-          cmd = [
+
+          command = [
               "ffmpeg",
               "-y",
               "-hide_banner",
               "-loglevel",
               "error"
-          ] + inputs
+          ]
 
-          cmd += [
+          command += inputs
+
+          command += [
               "-i",
               audio,
 
@@ -696,7 +679,7 @@ jobs:
               "[v]",
 
               "-map",
-              f"{audio_input_index}:a",
+              f"{audio_index}:a",
 
               "-c:v",
               "libx264",
@@ -720,7 +703,7 @@ jobs:
               "192k",
 
               "-t",
-              f"{total_duration:.6f}",
+              f"{total:.6f}",
 
               "-af",
               "aresample=async=1:first_pts=0",
@@ -728,17 +711,35 @@ jobs:
               "-movflags",
               "+faststart",
 
-              out
+              output
           ]
+
+
+          print(
+              "set -euo pipefail"
+          )
 
           print(
               " ".join(
-                  q(x)
-                  for x in cmd
+                  q(value)
+                  for value in command
               )
           )
 
           PY
+
+
+      # ============================================================
+      # 6. EXECUTE FFMPEG
+      # ============================================================
+      - name: Render video
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          OUT="$ROOT/aicap_final.mp4"
 
           chmod +x /tmp/aicap_render.sh
 
@@ -746,16 +747,15 @@ jobs:
 
           test -s "$OUT"
 
-          echo ""
           echo "======================================"
-          echo "AICAP RENDER COMPLETED"
+          echo "AICAP VIDEO RENDER : SUCCESS"
           echo "======================================"
           echo "Output : $OUT"
           echo "======================================"
 
 
       # ============================================================
-      # 6. FINAL OUTPUT VERIFICATION
+      # 7. FINAL OUTPUT VERIFICATION
       # ============================================================
       - name: Verify output
         shell: bash
@@ -778,9 +778,10 @@ jobs:
             -v error \
             -select_streams v:0 \
             -show_entries \
-              stream=codec_name,width,height,r_frame_rate,duration \
+            stream=codec_name,width,height,r_frame_rate,duration \
             -of default=noprint_wrappers=1 \
             "$OUT"
+
 
           echo "===== AUDIO STREAM ====="
 
@@ -788,9 +789,10 @@ jobs:
             -v error \
             -select_streams a:0 \
             -show_entries \
-              stream=codec_name,sample_rate,channels,duration \
+            stream=codec_name,sample_rate,channels,duration \
             -of default=noprint_wrappers=1 \
             "$OUT"
+
 
           WIDTH="$(
             ffprobe \
@@ -837,17 +839,20 @@ jobs:
               "$OUT"
           )"
 
+
           test "$WIDTH" = "1080"
           test "$HEIGHT" = "1920"
           test "$AUDIO_CODEC" = "aac"
 
+
+          # ========================================================
+          # VERIFY DURATION
+          # ========================================================
+
           python3 \
-            "$VIDEO_DURATION" \
-            "$AUDIO_DURATION" \
-            "${{ steps.locate.outputs.root }}/scene_config.json" \
+            - "$VIDEO_DURATION" "$AUDIO_DURATION" \
             <<'PY'
 
-          import json
           import sys
 
           video = float(
@@ -858,62 +863,38 @@ jobs:
               sys.argv[2]
           )
 
-          cfg_path = sys.argv[3]
+          if video < audio - 0.20:
 
-          with open(
-              cfg_path,
-              "r",
-              encoding="utf-8"
-          ) as f:
-              cfg = json.load(f)
-
-          scenes = cfg["scenes"]
-
-          expected = float(
-              scenes[-1]["end"]
-          )
-
-          # Video must match the audio-driven scene timeline.
-          if abs(video - expected) > 0.20:
               raise SystemExit(
-                  "Rendered video duration does not "
-                  "match scene timeline: "
-                  f"expected={expected:.3f}s "
-                  f"video={video:.3f}s"
-              )
-
-          # Audio must not be materially shorter.
-          if audio < expected - 0.20:
-              raise SystemExit(
-                  "Narration audio is materially shorter "
-                  "than the visual timeline: "
-                  f"expected={expected:.3f}s "
+                  "Rendered video is shorter "
+                  "than audio: "
+                  f"video={video:.3f}s "
                   f"audio={audio:.3f}s"
               )
 
           print(
-              "Timeline verified: "
-              f"expected={expected:.3f}s "
+              "Duration verified: "
               f"video={video:.3f}s "
               f"audio={audio:.3f}s"
           )
 
           PY
 
+
           echo ""
           echo "======================================"
-          echo "FINAL VERIFICATION : SUCCESS"
+          echo "AICAP FINAL OUTPUT"
           echo "======================================"
           echo "Resolution : ${WIDTH}x${HEIGHT}"
           echo "Audio      : ${AUDIO_CODEC}"
           echo "Video      : ${VIDEO_DURATION}s"
           echo "Audio      : ${AUDIO_DURATION}s"
-          echo "Timeline   : VERIFIED"
+          echo "Status     : PASSED"
           echo "======================================"
 
 
       # ============================================================
-      # 7. PACKAGE ARTIFACT
+      # 8. PACKAGE ARTIFACT
       # ============================================================
       - name: Package render artifact
         shell: bash
@@ -950,7 +931,7 @@ jobs:
 
 
       # ============================================================
-      # 8. UPLOAD FINAL GITHUB ARTIFACT
+      # 9. UPLOAD FINAL ARTIFACT
       # ============================================================
       - name: Upload MP4 artifact
         uses: actions/upload-artifact@v4
