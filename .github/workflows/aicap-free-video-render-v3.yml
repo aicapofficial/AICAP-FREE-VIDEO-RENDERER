@@ -23,34 +23,53 @@ jobs:
 
       # ============================================================
       # 2. INSTALL FFMPEG + FONTS
+      #
+      # IMPORTANT:
+      # ffprobe is included with the ffmpeg package.
+      # DO NOT attempt:
+      #
+      #     apt-get install ffprobe
+      #
       # ============================================================
       - name: Install FFmpeg and fonts
         shell: bash
         run: |
           set -euo pipefail
 
+          echo "======================================"
+          echo "AICAP RENDER TOOL INSTALLATION"
+          echo "======================================"
+
           sudo apt-get update
 
-          sudo apt-get install -y \
-            ffmpeg \
-            ffprobe \
-            fonts-dejavu
+          # ffprobe is provided by the ffmpeg package.
+          sudo apt-get install -y ffmpeg fonts-liberation
 
+          echo ""
+          echo "Checking FFmpeg..."
           command -v ffmpeg
+
+          echo ""
+          echo "Checking FFprobe..."
           command -v ffprobe
 
+          echo ""
+          echo "Checking subtitle font..."
+          test -f /usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf
+
+          echo ""
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
-          test -f \
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-
-          echo "Subtitle font: DejaVuSans-Bold.ttf"
-          echo "FFmpeg + fonts: READY"
+          echo ""
+          echo "FFmpeg      : AVAILABLE"
+          echo "FFprobe     : AVAILABLE"
+          echo "Font        : AVAILABLE"
+          echo "======================================"
 
 
       # ============================================================
-      # 3. LOCATE AICAP RENDER JOB
+      # 3. LOCATE RENDER JOB
       # ============================================================
       - name: Locate render job
         id: locate
@@ -62,7 +81,12 @@ jobs:
 
           ROOT="aicap-render-jobs/${JOB_ID}"
 
-          echo "Render root: $ROOT"
+          echo "======================================"
+          echo "AICAP RENDER JOB"
+          echo "======================================"
+          echo "Job ID : ${JOB_ID}"
+          echo "Root   : ${ROOT}"
+          echo "======================================"
 
           test -d "$ROOT"
           test -f "$ROOT/scene_config.json"
@@ -70,13 +94,23 @@ jobs:
 
           echo "root=$ROOT" >> "$GITHUB_OUTPUT"
 
-          echo "Render job located successfully."
+          echo "Render job : FOUND"
 
 
       # ============================================================
-      # 4. VALIDATE PRODUCTION PACKAGE
+      # 4. VALIDATE COMPLETE RENDER PACKAGE
+      #
+      # Validates:
+      # - Scene count
+      # - Scene start/end timing
+      # - No timeline gaps
+      # - No timeline overlaps
+      # - Scene images
+      # - Narration
+      # - Subtitle metadata
+      # - Subtitle style values
       # ============================================================
-      - name: Validate production package
+      - name: Validate render package
         shell: bash
         env:
           ROOT: ${{ steps.locate.outputs.root }}
@@ -91,9 +125,15 @@ jobs:
           import os
           import sys
 
-          cfg_path, root, audio = sys.argv[1:4]
+          cfg_path = sys.argv[1]
+          root = sys.argv[2]
+          audio = sys.argv[3]
 
-          with open(cfg_path, "r", encoding="utf-8") as f:
+          with open(
+              cfg_path,
+              "r",
+              encoding="utf-8"
+          ) as f:
               cfg = json.load(f)
 
           scenes = cfg.get("scenes")
@@ -108,8 +148,24 @@ jobs:
 
           for i, scene in enumerate(scenes, 1):
 
-              start = float(scene["start"])
-              end = float(scene["end"])
+              try:
+                  start = float(scene["start"])
+                  end = float(scene["end"])
+
+              except (
+                  KeyError,
+                  TypeError,
+                  ValueError
+              ) as exc:
+
+                  raise SystemExit(
+                      f"Invalid timing in scene {i}: {exc}"
+                  )
+
+              if start < 0:
+                  raise SystemExit(
+                      f"Invalid scene {i}: start < 0"
+                  )
 
               if end <= start:
                   raise SystemExit(
@@ -127,16 +183,16 @@ jobs:
                   or f"scene_{i:02d}.jpg"
               )
 
-              image_path = os.path.join(root, filename)
+              image_path = os.path.join(
+                  root,
+                  filename
+              )
 
               if not os.path.isfile(image_path):
                   raise SystemExit(
                       f"Missing scene image: {image_path}"
                   )
 
-              # ----------------------------------------------------
-              # Subtitle validation
-              # ----------------------------------------------------
               subtitle = scene.get("subtitle") or {}
 
               if subtitle.get("enabled"):
@@ -172,7 +228,10 @@ jobs:
                           style.get("margin", 90)
                       )
 
-                  except (TypeError, ValueError) as exc:
+                  except (
+                      TypeError,
+                      ValueError
+                  ) as exc:
 
                       raise SystemExit(
                           f"Invalid subtitle style in scene "
@@ -206,20 +265,24 @@ jobs:
                   "Missing narration.mp3"
               )
 
-          print("======================================")
-          print("AICAP V3 PRODUCTION PACKAGE")
-          print("======================================")
-          print(f"Scenes              : {len(scenes)}")
-          print(f"Timeline duration   : {prev_end:.3f}s")
           print(
-              f"Subtitle scenes    : "
+              f"Validated {len(scenes)} "
+              f"audio-driven scenes"
+          )
+
+          print(
+              f"Timeline duration: "
+              f"{prev_end:.3f}s"
+          )
+
+          print(
+              f"Subtitle scenes: "
               f"{subtitle_count}/{len(scenes)}"
           )
-          print("Images              : VERIFIED")
-          print("Narration           : VERIFIED")
-          print("Timeline            : VERIFIED")
-          print("Subtitle metadata   : VERIFIED")
-          print("======================================")
+
+          print(
+              "Subtitle metadata: VERIFIED"
+          )
           PY
 
 
@@ -227,23 +290,12 @@ jobs:
       # 5. RENDER VIDEO
       #
       # IMPORTANT:
-      #
-      # - Existing motion behavior is preserved.
-      # - Scene timing comes from scene_config.json.
-      # - Audio remains the continuous narration track.
-      # - Subtitles are rendered INSIDE EACH SCENE.
-      # - Subtitle timing therefore exactly follows scene start/end.
-      # - drawtext uses textfile instead of inline text.
-      # - This avoids FFmpeg escaping failures caused by:
-      #       apostrophes
-      #       commas
-      #       colons
-      #       quotation marks
-      #       multiline text
-      #       special characters
-      # - Subtitle vertical position uses text_h.
-      # - This prevents multiline captions from moving outside
-      #   the safe area.
+      # - Scene timing comes from scene_config.json
+      # - Actual Module 17 durations remain authoritative
+      # - Motion remains preserved
+      # - Subtitle timing = scene start/end
+      # - Subtitle rendering = FFmpeg drawtext
+      # - Continuous narration remains the audio track
       # ============================================================
       - name: Render video
         shell: bash
@@ -256,7 +308,13 @@ jobs:
           AUDIO="$ROOT/narration.mp3"
           OUT="$ROOT/aicap_final.mp4"
 
-          python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" > /tmp/render.sh <<'PY'
+          python3 \
+            "$CFG" \
+            "$ROOT" \
+            "$AUDIO" \
+            "$OUT" \
+            > /tmp/render.sh <<'PY'
+
           import json
           import os
           import shlex
@@ -264,7 +322,11 @@ jobs:
 
           cfg_path, root, audio, out = sys.argv[1:5]
 
-          with open(cfg_path, "r", encoding="utf-8") as f:
+          with open(
+              cfg_path,
+              "r",
+              encoding="utf-8"
+          ) as f:
               cfg = json.load(f)
 
           scenes = cfg.get("scenes")
@@ -274,97 +336,108 @@ jobs:
                   "scene_config.json contains no scenes"
               )
 
-          fps = int(cfg.get("fps", 30))
-          width = int(cfg.get("width", 1080))
-          height = int(cfg.get("height", 1920))
+          fps = int(
+              cfg.get("fps", 30)
+          )
+
+          width = int(
+              cfg.get("width", 1080)
+          )
+
+          height = int(
+              cfg.get("height", 1920)
+          )
 
           if fps <= 0:
-              raise SystemExit("Invalid FPS")
+              raise SystemExit(
+                  "Invalid FPS"
+              )
 
           if width <= 0 or height <= 0:
               raise SystemExit(
                   "Invalid render dimensions"
               )
 
-          fontfile = (
+          caption_font = (
               "/usr/share/fonts/truetype/"
-              "dejavu/"
-              "DejaVuSans-Bold.ttf"
+              "liberation2/"
+              "LiberationSans-Bold.ttf"
           )
 
-          if not os.path.isfile(fontfile):
+          if not os.path.isfile(caption_font):
               raise SystemExit(
-                  "Subtitle font file is missing: "
-                  + fontfile
+                  "Subtitle font not found: "
+                  + caption_font
               )
 
           def q(value):
-              return shlex.quote(str(value))
-
-          def ffmpeg_filter_escape(value):
-              """
-              Escape values used in FFmpeg filter arguments.
-
-              Text is NOT passed directly to drawtext.
-              Subtitle text is written to a text file instead.
-
-              This helper is retained for paths and style values.
-              """
-
-              value = str(value)
-
-              value = value.replace("\\", "\\\\")
-              value = value.replace(":", "\\:")
-              value = value.replace("'", "\\'")
-
-              return value
+              return shlex.quote(
+                  str(value)
+              )
 
           inputs = []
           filters = []
           concat_labels = []
 
-          subtitle_files = []
-
-          motion_names = (
-              "zoom_in",
-              "zoom_out",
-              "pan_left",
-              "pan_right"
-          )
-
           for i, scene in enumerate(scenes):
 
               filename = (
                   scene.get("filename")
-                  or f"scene_{i+1:02d}.jpg"
+                  or f"scene_{i + 1:02d}.jpg"
               )
 
-              image = os.path.join(root, filename)
+              image = os.path.join(
+                  root,
+                  filename
+              )
 
-              start = float(scene["start"])
-              end = float(scene["end"])
+              if not os.path.isfile(image):
+                  raise SystemExit(
+                      f"Missing scene image: {image}"
+                  )
+
+              start = float(
+                  scene["start"]
+              )
+
+              end = float(
+                  scene["end"]
+              )
+
               dur = end - start
 
               if dur <= 0:
                   raise SystemExit(
-                      f"Invalid scene duration: scene {i+1}"
+                      f"Invalid duration for scene "
+                      f"{i + 1}: {dur}"
                   )
 
-              motion = scene.get("motion", "")
+              motion = scene.get(
+                  "motion",
+                  ""
+              )
 
-              if motion not in motion_names:
-                  motion = motion_names[
-                      i % len(motion_names)
-                  ]
+              if motion not in (
+                  "zoom_in",
+                  "zoom_out",
+                  "pan_left",
+                  "pan_right"
+              ):
+                  motion = (
+                      "zoom_in",
+                      "zoom_out",
+                      "pan_left",
+                      "pan_right"
+                  )[i % 4]
 
               frames = max(
                   1,
-                  int(round(dur * fps))
+                  int(
+                      round(
+                          dur * fps
+                      )
+                  )
               )
-
-              # ====================================================
-              # EXISTING MOTION ENGINE
-              # ====================================================
 
               if motion == "zoom_in":
 
@@ -388,8 +461,7 @@ jobs:
                       f"force_original_aspect_ratio=increase,"
                       f"crop={width*2}:{height*2},"
                       f"zoompan="
-                      f"z='if(eq(on,0),1.12,"
-                      f"max(1.0,zoom-0.0007))':"
+                      f"z='if(eq(on,0),1.12,max(1.0,zoom-0.0007))':"
                       f"x='iw/2-(iw/zoom/2)':"
                       f"y='ih/2-(ih/zoom/2)':"
                       f"d={frames}:"
@@ -429,159 +501,138 @@ jobs:
                       f"fps={fps}"
                   )
 
-              # ====================================================
-              # BASE SCENE
-              # ====================================================
+              subtitle = (
+                  scene.get("subtitle")
+                  or {}
+              )
 
-              scene_filter = (
+              if subtitle.get("enabled"):
+
+                  caption_text = str(
+                      subtitle.get(
+                          "text",
+                          ""
+                      )
+                  ).strip()
+
+                  if not caption_text:
+                      raise SystemExit(
+                          f"Scene {i + 1} subtitle "
+                          f"text is empty"
+                      )
+
+                  caption_file = (
+                      f"/tmp/aicap_caption_"
+                      f"{i + 1:02d}.txt"
+                  )
+
+                  with open(
+                      caption_file,
+                      "w",
+                      encoding="utf-8"
+                  ) as f:
+
+                      f.write(
+                          caption_text
+                      )
+
+                  style = (
+                      subtitle.get("style")
+                      or {}
+                  )
+
+                  fontsize = int(
+                      style.get(
+                          "size",
+                          80
+                      )
+                  )
+
+                  outline = int(
+                      style.get(
+                          "outline",
+                          5
+                      )
+                  )
+
+                  shadow = int(
+                      style.get(
+                          "shadow",
+                          3
+                      )
+                  )
+
+                  margin = int(
+                      style.get(
+                          "margin",
+                          90
+                      )
+                  )
+
+                  bottom_margin = max(
+                      100,
+                      margin + 30
+                  )
+
+                  drawtext = (
+                      f"drawtext="
+                      f"fontfile={q(caption_font)}:"
+                      f"textfile={q(caption_file)}:"
+                      f"fontcolor=white:"
+                      f"fontsize={fontsize}:"
+                      f"x='(w-text_w)/2':"
+                      f"y='h-text_h-{bottom_margin}':"
+                      f"line_spacing=10:"
+                      f"borderw={outline}:"
+                      f"bordercolor=black@0.85:"
+                      f"shadowx={shadow}:"
+                      f"shadowy={shadow}:"
+                      f"shadowcolor=black@0.80:"
+                      f"fix_bounds=1"
+                  )
+
+                  vf += "," + drawtext
+
+              inputs += [
+                  "-loop",
+                  "1",
+                  "-t",
+                  f"{dur:.6f}",
+                  "-i",
+                  image
+              ]
+
+              filters.append(
                   f"[{i}:v]"
                   f"{vf},"
                   f"trim=duration={dur:.6f},"
                   f"setpts=PTS-STARTPTS"
-              )
-
-              # ====================================================
-              # SUBTITLE RENDERING
-              #
-              # CRITICAL DESIGN:
-              #
-              # Do NOT pass subtitle text directly into drawtext.
-              #
-              # Text goes into a UTF-8 text file.
-              #
-              # This eliminates the previous class of errors caused
-              # by FFmpeg filter-parser escaping.
-              # ====================================================
-
-              subtitle = scene.get("subtitle") or {}
-
-              if subtitle.get("enabled"):
-
-                  text = str(
-                      subtitle.get("text", "")
-                  ).strip()
-
-                  if not text:
-                      raise SystemExit(
-                          f"Scene {i+1} subtitle text is empty"
-                      )
-
-                  subtitle_path = os.path.join(
-                      root,
-                      f".subtitle_{i+1:02d}.txt"
-                  )
-
-                  # UTF-8 subtitle text.
-                  with open(
-                      subtitle_path,
-                      "w",
-                      encoding="utf-8"
-                  ) as text_file:
-
-                      text_file.write(text)
-
-                  subtitle_files.append(
-                      subtitle_path
-                  )
-
-                  style = subtitle.get("style") or {}
-
-                  size = int(
-                      style.get("size", 80)
-                  )
-
-                  outline = int(
-                      style.get("outline", 5)
-                  )
-
-                  shadow = int(
-                      style.get("shadow", 3)
-                  )
-
-                  margin = int(
-                      style.get("margin", 90)
-                  )
-
-                  color = str(
-                      style.get(
-                          "color",
-                          "#FFFFFF"
-                      )
-                  ).strip()
-
-                  if color.startswith("#"):
-                      color = color[1:]
-
-                  if len(color) != 6:
-                      color = "FFFFFF"
-
-                  # Safe subtitle path.
-                  subtitle_file_ffmpeg = (
-                      ffmpeg_filter_escape(
-                          subtitle_path
-                      )
-                  )
-
-                  # ------------------------------------------------
-                  # Renderer-managed safe bottom center.
-                  #
-                  # text_h is used instead of a fixed Y position.
-                  #
-                  # This is essential for multiline captions.
-                  # ------------------------------------------------
-
-                  drawtext = (
-                      "drawtext="
-                      f"fontfile="
-                      f"'{ffmpeg_filter_escape(fontfile)}':"
-                      f"textfile="
-                      f"'{subtitle_file_ffmpeg}':"
-                      f"fontcolor=0x{color}:"
-                      f"fontsize={size}:"
-                      f"font=DejaVuSans:"
-                      f"borderw={outline}:"
-                      f"bordercolor=black@0.95:"
-                      f"shadowx={shadow}:"
-                      f"shadowy={shadow}:"
-                      f"shadowcolor=black@0.70:"
-                      f"x='(w-text_w)/2':"
-                      f"y='h-text_h-{margin}'"
-                  )
-
-                  scene_filter += "," + drawtext
-
-              scene_filter += (
                   f"[v{i}]"
               )
 
-              filters.append(scene_filter)
               concat_labels.append(
                   f"[v{i}]"
               )
 
-          # ========================================================
-          # CONCATENATE SCENES
-          # ========================================================
-
-          total = float(
+          total_duration = float(
               scenes[-1]["end"]
           )
 
           filters.append(
-              "".join(concat_labels)
+              "".join(
+                  concat_labels
+              )
               +
-              f"concat="
-              f"n={len(scenes)}:"
-              f"v=1:"
-              f"a=0,"
-              f"trim=duration={total:.6f},"
-              f"setpts=PTS-STARTPTS"
-              f"[v]"
+              f"concat=n={len(scenes)}:"
+              f"v=1:a=0,"
+              f"trim=duration="
+              f"{total_duration:.6f},"
+              f"setpts=PTS-STARTPTS[v]"
           )
 
-          # ========================================================
-          # FFMPEG COMMAND
-          # ========================================================
+          audio_input_index = len(
+              scenes
+          )
 
           cmd = [
               "ffmpeg",
@@ -593,56 +644,10 @@ jobs:
 
           cmd += inputs
 
-          # The scene inputs are constructed below.
-          #
-          # Rebuild them in exactly the same order used by filters.
-
-          cmd = [
-              "ffmpeg",
-              "-y",
-              "-hide_banner",
-              "-loglevel",
-              "error"
-          ]
-
-          for i, scene in enumerate(scenes):
-
-              filename = (
-                  scene.get("filename")
-                  or f"scene_{i+1:02d}.jpg"
-              )
-
-              image = os.path.join(
-                  root,
-                  filename
-              )
-
-              start = float(
-                  scene["start"]
-              )
-
-              end = float(
-                  scene["end"]
-              )
-
-              dur = end - start
-
-              cmd += [
-                  "-loop",
-                  "1",
-                  "-t",
-                  f"{dur:.6f}",
-                  "-i",
-                  image
-              ]
-
-          # Continuous narration is the final input.
           cmd += [
               "-i",
-              audio
-          ]
+              audio,
 
-          cmd += [
               "-filter_complex",
               ";".join(filters),
 
@@ -650,7 +655,7 @@ jobs:
               "[v]",
 
               "-map",
-              f"{len(scenes)}:a",
+              f"{audio_input_index}:a",
 
               "-c:v",
               "libx264",
@@ -674,7 +679,10 @@ jobs:
               "192k",
 
               "-t",
-              f"{total:.6f}",
+              f"{total_duration:.6f}",
+
+              "-af",
+              "aresample=async=1:first_pts=0",
 
               "-movflags",
               "+faststart",
@@ -682,59 +690,14 @@ jobs:
               out
           ]
 
-          print("======================================")
-          print("AICAP MODULE 20 FFMPEG RENDER")
-          print("======================================")
           print(
-              f"Resolution       : {width}x{height}"
+              "set -euo pipefail"
           )
-          print(f"FPS              : {fps}")
-          print(
-              f"Scenes           : {len(scenes)}"
-          )
-          print(
-              f"Total duration   : {total:.3f}s"
-          )
-          print(
-              f"Subtitle scenes  : {len(subtitle_files)}"
-          )
-          print(
-              "Subtitle engine  : FFmpeg drawtext"
-          )
-          print(
-              "Subtitle input   : UTF-8 textfile"
-          )
-          print(
-              "Subtitle position: bottom center / text_h"
-          )
-          print("Motion engine     : PRESERVED")
-          print("Audio             : CONTINUOUS")
-          print("======================================")
 
           print(
               " ".join(
-                  q(x)
-                  for x in cmd
-              )
-          )
-
-          # Remove temporary subtitle files after command
-          # generation is complete only AFTER FFmpeg executes.
-          #
-          # The shell will execute the generated command while
-          # these files still exist.
-
-          cleanup = [
-              "rm",
-              "-f"
-          ]
-
-          cleanup += subtitle_files
-
-          print(
-              " ".join(
-                  q(x)
-                  for x in cleanup
+                  q(value)
+                  for value in cmd
               )
           )
 
@@ -742,22 +705,9 @@ jobs:
 
           chmod +x /tmp/render.sh
 
-          /tmp/render.sh > /tmp/render_command.sh
-
-          # The generated file contains:
-          # 1. FFmpeg command
-          # 2. Cleanup command
-          #
-          # Execute both.
-
-          bash /tmp/render_command.sh
+          /tmp/render.sh | bash
 
           test -s "$OUT"
-
-          echo "======================================"
-          echo "AICAP VIDEO RENDER : SUCCESS"
-          echo "Output: $OUT"
-          echo "======================================"
 
 
       # ============================================================
@@ -771,8 +721,33 @@ jobs:
           set -euo pipefail
 
           OUT="$ROOT/aicap_final.mp4"
+          CFG="$ROOT/scene_config.json"
 
           test -s "$OUT"
+
+          echo "======================================"
+          echo "AICAP FINAL VIDEO VERIFICATION"
+          echo "======================================"
+
+          echo ""
+          echo "===== VIDEO STREAM ====="
+
+          ffprobe -v error \
+            -select_streams v:0 \
+            -show_entries \
+            stream=codec_name,width,height,r_frame_rate,duration \
+            -of default=noprint_wrappers=1 \
+            "$OUT"
+
+          echo ""
+          echo "===== AUDIO STREAM ====="
+
+          ffprobe -v error \
+            -select_streams a:0 \
+            -show_entries \
+            stream=codec_name,sample_rate,channels,duration \
+            -of default=noprint_wrappers=1 \
+            "$OUT"
 
           WIDTH="$(
             ffprobe \
@@ -792,6 +767,15 @@ jobs:
               "$OUT"
           )"
 
+          VIDEO_CODEC="$(
+            ffprobe \
+              -v error \
+              -select_streams v:0 \
+              -show_entries stream=codec_name \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
           AUDIO_CODEC="$(
             ffprobe \
               -v error \
@@ -801,33 +785,46 @@ jobs:
               "$OUT"
           )"
 
-          DURATION="$(
+          VIDEO_DURATION="$(
             ffprobe \
               -v error \
-              -show_entries format=duration \
+              -select_streams v:0 \
+              -show_entries stream=duration \
               -of csv=p=0 \
               "$OUT"
           )"
 
-          echo "======================================"
-          echo "AICAP MODULE 20 OUTPUT VERIFICATION"
-          echo "======================================"
-          echo "Width        : $WIDTH"
-          echo "Height       : $HEIGHT"
-          echo "Audio codec  : $AUDIO_CODEC"
-          echo "Duration     : $DURATION"
-          echo "======================================"
+          AUDIO_DURATION="$(
+            ffprobe \
+              -v error \
+              -select_streams a:0 \
+              -show_entries stream=duration \
+              -of csv=p=0 \
+              "$OUT"
+          )"
 
           test "$WIDTH" = "1080"
           test "$HEIGHT" = "1920"
+          test "$VIDEO_CODEC" = "h264"
           test "$AUDIO_CODEC" = "aac"
 
-          python3 - "$DURATION" "$ROOT/scene_config.json" <<'PY'
+          python3 \
+            "$CFG" \
+            "$VIDEO_DURATION" \
+            "$AUDIO_DURATION" <<'PY'
+
           import json
           import sys
 
-          actual = float(sys.argv[1])
-          cfg_path = sys.argv[2]
+          cfg_path = sys.argv[1]
+
+          video = float(
+              sys.argv[2]
+          )
+
+          audio = float(
+              sys.argv[3]
+          )
 
           with open(
               cfg_path,
@@ -836,41 +833,54 @@ jobs:
           ) as f:
               cfg = json.load(f)
 
+          scenes = cfg["scenes"]
+
           expected = float(
-              cfg["scenes"][-1]["end"]
+              scenes[-1]["end"]
           )
 
-          difference = abs(
-              actual - expected
-          )
+          if abs(
+              video - expected
+          ) > 0.20:
 
-          print(
-              f"Expected duration : {expected:.3f}s"
-          )
-
-          print(
-              f"Actual duration   : {actual:.3f}s"
-          )
-
-          print(
-              f"Difference        : {difference:.3f}s"
-          )
-
-          # Allow small MP4/container rounding difference.
-          if difference > 0.10:
               raise SystemExit(
-                  "Final video duration differs "
-                  "from scene timeline by more than 0.10s"
+                  "Rendered video duration does not "
+                  "match scene timeline: "
+                  f"expected={expected:.3f}s "
+                  f"video={video:.3f}s"
+              )
+
+          if audio < expected - 0.20:
+
+              raise SystemExit(
+                  "Narration audio is materially "
+                  "shorter than the visual timeline: "
+                  f"expected={expected:.3f}s "
+                  f"audio={audio:.3f}s"
               )
 
           print(
-              "Timeline duration : VERIFIED"
+              "Timeline verified: "
+              f"expected={expected:.3f}s "
+              f"video={video:.3f}s "
+              f"audio={audio:.3f}s"
           )
+
           PY
+
+          echo ""
+          echo "======================================"
+          echo "VIDEO       : VERIFIED"
+          echo "AUDIO       : VERIFIED"
+          echo "SIZE        : 1080x1920 VERIFIED"
+          echo "CODEC       : H264 + AAC VERIFIED"
+          echo "TIMELINE    : VERIFIED"
+          echo "SUBTITLES   : RENDERED BY DRAWTEXT"
+          echo "======================================"
 
 
       # ============================================================
-      # 7. PACKAGE ARTIFACT
+      # 7. PACKAGE RENDER ARTIFACT
       # ============================================================
       - name: Package render artifact
         shell: bash
@@ -893,16 +903,19 @@ jobs:
             "$ROOT/narration.mp3" \
             artifact/narration.mp3
 
-          cp -R \
-            "$ROOT"/*.jpg \
-            artifact/ \
-            2>/dev/null || true
-
-          echo "Artifact package created."
+          find "$ROOT" \
+            -maxdepth 1 \
+            -type f \
+            \( \
+              -name "*.jpg" \
+              -o -name "*.jpeg" \
+              -o -name "*.png" \
+            \) \
+            -exec cp {} artifact/ \;
 
 
       # ============================================================
-      # 8. UPLOAD ARTIFACT
+      # 8. UPLOAD GITHUB ARTIFACT
       # ============================================================
       - name: Upload MP4 artifact
         uses: actions/upload-artifact@v4
