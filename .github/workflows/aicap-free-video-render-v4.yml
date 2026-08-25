@@ -1,0 +1,723 @@
+name: AICAP Free Video Render V4
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "AICAP render job ID"
+        required: true
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout renderer
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg and fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-liberation
+
+          command -v ffmpeg
+          command -v ffprobe
+
+          echo "FFmpeg:"
+          ffmpeg -version | head -n 1
+
+          echo "FFmpeg subtitle filters:"
+          ffmpeg -hide_banner -filters | grep -E '(^| )subtitles |(^| )ass ' >/dev/null
+
+          test -f /usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf
+          test -f /usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf
+
+      - name: Locate render job
+        id: locate
+        shell: bash
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          set -euo pipefail
+
+          ROOT="aicap-render-jobs/${JOB_ID}"
+
+          echo "======================================"
+          echo "AICAP RENDER JOB"
+          echo "======================================"
+          echo "Job ID : ${JOB_ID}"
+          echo "Root   : ${ROOT}"
+          echo "======================================"
+
+          test -d "$ROOT"
+          test -s "$ROOT/scene_config.json"
+          test -s "$ROOT/narration.mp3"
+
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Render video
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          CFG="$ROOT/scene_config.json"
+          AUDIO="$ROOT/narration.mp3"
+          OUT="$ROOT/aicap_final.mp4"
+
+          python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" <<'PY'
+          import json
+          import math
+          import os
+          import shlex
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          cfg_path = Path(sys.argv[1]).resolve()
+          root = Path(sys.argv[2]).resolve()
+          audio = Path(sys.argv[3]).resolve()
+          output = Path(sys.argv[4]).resolve()
+
+          WORK = root / "_aicap_work"
+          WORK.mkdir(parents=True, exist_ok=True)
+
+          def fail(message):
+              raise SystemExit("AICAP RENDER ERROR: " + str(message))
+
+          def run(cmd, label):
+              print("")
+              print("======================================")
+              print(label)
+              print("======================================")
+              print(" ".join(shlex.quote(str(x)) for x in cmd))
+              result = subprocess.run(
+                  [str(x) for x in cmd],
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True
+              )
+              print(result.stdout)
+              if result.returncode != 0:
+                  fail(label + " failed with exit code " + str(result.returncode))
+              return result
+
+          # ------------------------------------------------------------
+          # 1. READ JSON AS JSON DATA
+          # ------------------------------------------------------------
+          try:
+              with cfg_path.open("r", encoding="utf-8") as f:
+                  cfg = json.load(f)
+          except Exception as exc:
+              fail("Cannot parse scene_config.json as JSON: " + str(exc))
+
+          if not isinstance(cfg, dict):
+              fail("scene_config.json root must be an object")
+
+          project = cfg.get("project") or {}
+
+          resolution = project.get("resolution") or {}
+          width = int(resolution.get("width", cfg.get("width", 1080)))
+          height = int(resolution.get("height", cfg.get("height", 1920)))
+          fps = int(project.get("fps", cfg.get("fps", 30)))
+
+          if width != 1080 or height != 1920:
+              fail(f"Required output is 1080x1920, received {width}x{height}")
+
+          if fps != 30:
+              fail(f"Required FPS is 30, received {fps}")
+
+          scenes = cfg.get("scenes")
+
+          if not isinstance(scenes, list) or not scenes:
+              fail("scene_config.json contains no scenes")
+
+          # ------------------------------------------------------------
+          # 2. AUTHORITATIVE AUDIO-DRIVEN TIMELINE
+          # ------------------------------------------------------------
+          normalized = []
+          previous_end = 0.0
+
+          for index, scene in enumerate(scenes, 1):
+              if not isinstance(scene, dict):
+                  fail(f"Scene {index} is not an object")
+
+              try:
+                  start = float(scene["start"])
+                  end = float(scene["end"])
+              except Exception as exc:
+                  fail(f"Scene {index} has invalid start/end: {exc}")
+
+              if start < -0.001:
+                  fail(f"Scene {index} starts before zero")
+
+              if end <= start:
+                  fail(f"Scene {index} has end <= start")
+
+              if abs(start - previous_end) > 0.01:
+                  fail(
+                      f"Timeline gap/overlap before scene {index}: "
+                      f"{start:.3f} != {previous_end:.3f}"
+                  )
+
+              filename = str(
+                  scene.get("filename") or f"scene_{index:02d}.jpg"
+              ).strip()
+
+              image = (root / filename).resolve()
+
+              # Prevent path traversal outside the render job.
+              try:
+                  image.relative_to(root)
+              except ValueError:
+                  fail(f"Scene {index} image path escapes render job: {filename}")
+
+              if not image.is_file() or image.stat().st_size == 0:
+                  fail(f"Missing/empty scene image: {image}")
+
+              duration = end - start
+
+              normalized.append({
+                  "index": index,
+                  "start": start,
+                  "end": end,
+                  "duration": duration,
+                  "filename": filename,
+                  "image": image,
+                  "motion": str(scene.get("motion") or "").strip(),
+                  "subtitle": scene.get("subtitle") or {}
+              })
+
+              previous_end = end
+
+          total_duration = float(previous_end)
+
+          if total_duration <= 0:
+              fail("Total timeline duration is zero")
+
+          if not audio.is_file() or audio.stat().st_size == 0:
+              fail("narration.mp3 is missing or empty")
+
+          def probe_duration(path):
+              result = subprocess.run(
+                  [
+                      "ffprobe",
+                      "-v", "error",
+                      "-show_entries", "format=duration",
+                      "-of", "default=noprint_wrappers=1:nokey=1",
+                      str(path)
+                  ],
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True
+              )
+              if result.returncode != 0:
+                  fail("ffprobe failed for " + str(path) + "\n" + result.stdout)
+              try:
+                  return float(result.stdout.strip())
+              except Exception:
+                  fail("Could not read duration from " + str(path))
+
+          audio_duration = probe_duration(audio)
+
+          if abs(audio_duration - total_duration) > 0.25:
+              fail(
+                  "Narration/timeline mismatch: "
+                  f"audio={audio_duration:.3f}s "
+                  f"timeline={total_duration:.3f}s"
+              )
+
+          print("")
+          print("======================================")
+          print("AICAP INPUT VALIDATION : PASSED")
+          print("======================================")
+          print(f"Scenes           : {len(normalized)}")
+          print(f"Resolution       : {width}x{height}")
+          print(f"FPS              : {fps}")
+          print(f"Timeline         : {total_duration:.3f}s")
+          print(f"Narration        : {audio_duration:.3f}s")
+          print(f"Audio difference : {abs(audio_duration-total_duration):.3f}s")
+          print("JSON parser      : Python json.load()")
+          print("======================================")
+
+          # ------------------------------------------------------------
+          # 3. BUILD ONE GLOBAL ASS SUBTITLE FILE
+          #
+          # Subtitles are NOT drawn separately inside each scene filter.
+          # They are burned into the completed continuous video in one
+          # final pass. This makes subtitle timing independent of the
+          # image/motion filter graph.
+          # ------------------------------------------------------------
+          def ass_time(seconds):
+              seconds = max(0.0, float(seconds))
+              total_cs = int(round(seconds * 100))
+              hours = total_cs // 360000
+              minutes = (total_cs % 360000) // 6000
+              centiseconds = total_cs % 100
+              secs = (total_cs % 6000) // 100
+              return f"{hours}:{minutes:02d}:{secs:02d}.{centiseconds:02d}"
+
+          def ass_text(value):
+              text = "" if value is None else str(value)
+              text = text.replace("\r\n", "\n").replace("\r", "\n")
+              text = text.replace("\x00", "")
+              # ASS override tags use braces; keep user text literal.
+              text = text.replace("{", "(").replace("}", ")")
+              text = text.replace("\\", r"\\")
+              text = text.replace("\n", r"\N")
+              return text.strip()
+
+          def wrap_caption(value, width_chars=32, max_lines=4):
+              raw = "" if value is None else str(value)
+              raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+              paragraphs = [p.strip() for p in raw.split("\n") if p.strip()]
+              lines = []
+
+              for paragraph in paragraphs:
+                  words = paragraph.split()
+                  line = ""
+                  for word in words:
+                      if not line:
+                          line = word
+                      elif len(line) + 1 + len(word) <= width_chars:
+                          line += " " + word
+                      else:
+                          lines.append(line)
+                          line = word
+                  if line:
+                      lines.append(line)
+
+              if len(lines) > max_lines:
+                  lines = lines[:max_lines]
+                  lines[-1] = lines[-1].rstrip(".,;:!?") + "…"
+
+              return "\n".join(lines)
+
+          ass_path = WORK / "aicap_subtitles.ass"
+
+          subtitle_size = 80
+          subtitle_outline = 5
+          subtitle_shadow = 3
+          subtitle_margin = 90
+
+          # Use the established safe bottom-center position.
+          ass_lines = [
+              "[Script Info]",
+              "ScriptType: v4.00+",
+              "PlayResX: 1080",
+              "PlayResY: 1920",
+              "ScaledBorderAndShadow: yes",
+              "",
+              "[V4+ Styles]",
+              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+              f"Style: AICAP,Liberation Sans,{subtitle_size},&H00FFFFFF,&H00FFFFFF,&H80000000,&H80000000,-1,0,0,0,100,100,0,0,1,{subtitle_outline},{subtitle_shadow},2,{subtitle_margin},{subtitle_margin},{subtitle_margin},1",
+              "",
+              "[Events]",
+              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+          ]
+
+          subtitle_count = 0
+
+          for scene in normalized:
+              subtitle = scene["subtitle"]
+              enabled = subtitle.get("enabled", True)
+
+              if not enabled:
+                  continue
+
+              text = subtitle.get("text", "")
+              text = wrap_caption(text)
+
+              if not text:
+                  continue
+
+              ass_lines.append(
+                  "Dialogue: 0,"
+                  + ass_time(scene["start"])
+                  + ","
+                  + ass_time(scene["end"])
+                  + ",AICAP,,0,0,"
+                  + str(subtitle_margin)
+                  + ",,"
+                  + ass_text(text)
+              )
+
+              subtitle_count += 1
+
+          ass_path.write_text(
+              "\n".join(ass_lines) + "\n",
+              encoding="utf-8"
+          )
+
+          print("")
+          print("======================================")
+          print("AICAP SUBTITLE FILE")
+          print("======================================")
+          print(f"Subtitle events : {subtitle_count}")
+          print(f"ASS file        : {ass_path}")
+          print("Subtitle engine : FFmpeg libass")
+          print("Timing          : scene start/end")
+          print("Position        : bottom center")
+          print("======================================")
+
+          if subtitle_count == 0:
+              fail("No enabled subtitle events were found in scene_config.json")
+
+          # ------------------------------------------------------------
+          # 4. RENDER EACH SCENE AS AN INDEPENDENT CLIP
+          #
+          # This is the key stability change.
+          # One failed scene is immediately visible in the log.
+          # No giant multi-input filter graph is used.
+          # ------------------------------------------------------------
+          allowed_motions = {
+              "zoom_in",
+              "zoom_out",
+              "pan_left",
+              "pan_right"
+          }
+
+          clip_paths = []
+
+          for scene in normalized:
+              i = scene["index"]
+              dur = scene["duration"]
+              image = scene["image"]
+
+              motion = scene["motion"]
+              if motion not in allowed_motions:
+                  motion = (
+                      "zoom_in",
+                      "zoom_out",
+                      "pan_left",
+                      "pan_right"
+                  )[(i - 1) % 4]
+
+              clip = WORK / f"scene_{i:02d}.mp4"
+
+              # First create a large 2x canvas so all camera moves have
+              # room without exposing black edges.
+              base = (
+                  f"scale={width*2}:{height*2}:"
+                  "force_original_aspect_ratio=increase,"
+                  f"crop={width*2}:{height*2}"
+              )
+
+              if motion == "zoom_in":
+                  visual = (
+                      base
+                      + ",zoompan="
+                      + "z='min(zoom+0.0007,1.12)':"
+                      + "x='iw/2-(iw/zoom/2)':"
+                      + "y='ih/2-(ih/zoom/2)':"
+                      + "d=1:"
+                      + f"s={width}x{height}:"
+                      + f"fps={fps}"
+                  )
+
+              elif motion == "zoom_out":
+                  visual = (
+                      base
+                      + ",zoompan="
+                      + "z='max(1.0,1.12-on*0.0007)':"
+                      + "x='iw/2-(iw/zoom/2)':"
+                      + "y='ih/2-(ih/zoom/2)':"
+                      + "d=1:"
+                      + f"s={width}x{height}:"
+                      + f"fps={fps}"
+                  )
+
+              elif motion == "pan_left":
+                  visual = (
+                      base
+                      + f",crop={width}:{height}:"
+                      + f"x='(iw-{width})*min(t/{dur:.6f},1)':"
+                      + f"y='(ih-{height})/2'"
+                  )
+
+              else:
+                  visual = (
+                      base
+                      + f",crop={width}:{height}:"
+                      + f"x='(iw-{width})*(1-min(t/{dur:.6f},1))':"
+                      + f"y='(ih-{height})/2'"
+                  )
+
+              fade = min(0.5, max(0.05, dur / 4.0))
+              fade_out_start = max(0.0, dur - fade)
+
+              visual += (
+                  f",fade=t=in:st=0:d={fade:.6f}"
+                  f",fade=t=out:st={fade_out_start:.6f}:d={fade:.6f}"
+                  ",format=yuv420p"
+              )
+
+              run(
+                  [
+                      "ffmpeg",
+                      "-y",
+                      "-hide_banner",
+                      "-loglevel", "error",
+                      "-loop", "1",
+                      "-framerate", str(fps),
+                      "-i", str(image),
+                      "-t", f"{dur:.6f}",
+                      "-vf", visual,
+                      "-an",
+                      "-c:v", "libx264",
+                      "-preset", "veryfast",
+                      "-crf", "20",
+                      "-pix_fmt", "yuv420p",
+                      "-r", str(fps),
+                      "-movflags", "+faststart",
+                      str(clip)
+                  ],
+                  f"RENDER SCENE {i}/{len(normalized)} [{motion}]"
+              )
+
+              if not clip.is_file() or clip.stat().st_size == 0:
+                  fail(f"Scene {i} produced no output")
+
+              clip_duration = probe_duration(clip)
+
+              if abs(clip_duration - dur) > 0.15:
+                  fail(
+                      f"Scene {i} duration mismatch: "
+                      f"expected={dur:.3f}s actual={clip_duration:.3f}s"
+                  )
+
+              clip_paths.append(clip)
+
+          # ------------------------------------------------------------
+          # 5. CONCATENATE SCENE CLIPS
+          # ------------------------------------------------------------
+          concat_list = WORK / "concat.txt"
+
+          concat_lines = []
+          for clip in clip_paths:
+              # concat demuxer uses single-quoted paths.
+              path_text = str(clip).replace("'", "'\\''")
+              concat_lines.append("file '" + path_text + "'")
+
+          concat_list.write_text(
+              "\n".join(concat_lines) + "\n",
+              encoding="utf-8"
+          )
+
+          joined = WORK / "aicap_joined.mp4"
+
+          run(
+              [
+                  "ffmpeg",
+                  "-y",
+                  "-hide_banner",
+                  "-loglevel", "error",
+                  "-f", "concat",
+                  "-safe", "0",
+                  "-i", str(concat_list),
+                  "-c", "copy",
+                  "-movflags", "+faststart",
+                  str(joined)
+              ],
+              "JOIN SCENES"
+          )
+
+          joined_duration = probe_duration(joined)
+
+          if abs(joined_duration - total_duration) > 0.20:
+              fail(
+                  "Joined video duration mismatch: "
+                  f"expected={total_duration:.3f}s "
+                  f"actual={joined_duration:.3f}s"
+              )
+
+          # ------------------------------------------------------------
+          # 6. FINAL PASS:
+          #    BURN GLOBAL ASS SUBTITLES + ADD REAL NARRATION
+          #
+          # The subtitle filter is applied to the already continuous
+          # video, so scene boundaries and subtitle timing cannot drift.
+          # ------------------------------------------------------------
+          run(
+              [
+                  "ffmpeg",
+                  "-y",
+                  "-hide_banner",
+                  "-loglevel", "error",
+                  "-i", str(joined),
+                  "-i", str(audio),
+                  "-vf", f"subtitles={ass_path}:fontsdir=/usr/share/fonts/truetype/liberation2",
+                  "-map", "0:v:0",
+                  "-map", "1:a:0",
+                  "-c:v", "libx264",
+                  "-preset", "medium",
+                  "-crf", "20",
+                  "-pix_fmt", "yuv420p",
+                  "-r", str(fps),
+                  "-c:a", "aac",
+                  "-b:a", "192k",
+                  "-af", "aresample=async=1:first_pts=0",
+                  "-t", f"{total_duration:.6f}",
+                  "-movflags", "+faststart",
+                  str(output)
+              ],
+              "FINALIZE VIDEO + SUBTITLES + NARRATION"
+          )
+
+          if not output.is_file() or output.stat().st_size == 0:
+              fail("Final MP4 was not created")
+
+          final_duration = probe_duration(output)
+
+          if abs(final_duration - total_duration) > 0.25:
+              fail(
+                  "Final video duration mismatch: "
+                  f"expected={total_duration:.3f}s "
+                  f"actual={final_duration:.3f}s"
+              )
+
+          print("")
+          print("======================================")
+          print("AICAP RENDER COMPLETE")
+          print("======================================")
+          print(f"Output           : {output}")
+          print(f"Duration         : {final_duration:.3f}s")
+          print(f"Resolution       : {width}x{height}")
+          print(f"FPS              : {fps}")
+          print(f"Subtitle events  : {subtitle_count}")
+          print("Subtitles burned : YES")
+          print("Narration        : YES")
+          print("Motion           : YES")
+          print("Fade transitions : YES")
+          print("======================================")
+          PY
+
+      - name: Verify final MP4
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          OUT="$ROOT/aicap_final.mp4"
+
+          test -s "$OUT"
+
+          WIDTH="$(
+            ffprobe -v error \
+              -select_streams v:0 \
+              -show_entries stream=width \
+              -of csv=p=0 "$OUT"
+          )"
+
+          HEIGHT="$(
+            ffprobe -v error \
+              -select_streams v:0 \
+              -show_entries stream=height \
+              -of csv=p=0 "$OUT"
+          )"
+
+          VCODEC="$(
+            ffprobe -v error \
+              -select_streams v:0 \
+              -show_entries stream=codec_name \
+              -of csv=p=0 "$OUT"
+          )"
+
+          ACODEC="$(
+            ffprobe -v error \
+              -select_streams a:0 \
+              -show_entries stream=codec_name \
+              -of csv=p=0 "$OUT"
+          )"
+
+          V_DURATION="$(
+            ffprobe -v error \
+              -select_streams v:0 \
+              -show_entries stream=duration \
+              -of csv=p=0 "$OUT"
+          )"
+
+          A_DURATION="$(
+            ffprobe -v error \
+              -select_streams a:0 \
+              -show_entries stream=duration \
+              -of csv=p=0 "$OUT"
+          )"
+
+          FPS="$(
+            ffprobe -v error \
+              -select_streams v:0 \
+              -show_entries stream=r_frame_rate \
+              -of csv=p=0 "$OUT"
+          )"
+
+          test "$WIDTH" = "1080"
+          test "$HEIGHT" = "1920"
+          test "$VCODEC" = "h264"
+          test "$ACODEC" = "aac"
+          test -n "$V_DURATION"
+          test -n "$A_DURATION"
+
+          echo ""
+          echo "======================================"
+          echo "AICAP FINAL MP4 VERIFICATION"
+          echo "======================================"
+          echo "Resolution : ${WIDTH}x${HEIGHT}"
+          echo "FPS        : ${FPS}"
+          echo "Video      : ${VCODEC}"
+          echo "Audio      : ${ACODEC}"
+          echo "Video time : ${V_DURATION}s"
+          echo "Audio time : ${A_DURATION}s"
+          echo "======================================"
+
+          awk -v v="$V_DURATION" -v a="$A_DURATION" 'BEGIN {
+            d = v - a
+            if (d < 0) d = -d
+            if (d > 0.25) {
+              printf "ERROR: video/audio duration mismatch: %.3fs vs %.3fs\n", v, a
+              exit 1
+            }
+          }'
+
+          echo "FINAL VERIFICATION: SUCCESS"
+
+      - name: Package render artifact
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          rm -rf artifact
+          mkdir -p artifact
+
+          cp "$ROOT/aicap_final.mp4" artifact/aicap_final.mp4
+          cp "$ROOT/scene_config.json" artifact/scene_config.json
+          cp "$ROOT/narration.mp3" artifact/narration.mp3
+
+          if [ -f "$ROOT/_aicap_work/aicap_subtitles.ass" ]; then
+            cp "$ROOT/_aicap_work/aicap_subtitles.ass" artifact/aicap_subtitles.ass
+          fi
+
+          find "$ROOT" \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" \) \
+            -exec cp {} artifact/ \;
+
+          ls -lh artifact/
+
+      - name: Upload final render artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aicap-render-${{ inputs.job_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 7
