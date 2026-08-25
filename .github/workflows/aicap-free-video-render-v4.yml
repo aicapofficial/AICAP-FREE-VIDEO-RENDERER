@@ -42,24 +42,27 @@ jobs:
 
           sudo apt-get install -y \
             ffmpeg \
-            fonts-liberation
+            fontconfig \
+            fonts-dejavu
 
           command -v ffmpeg
           command -v ffprobe
+          command -v fc-match
 
-          FONT_REGULAR="/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"
-          FONT_BOLD="/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+          FONT_FILE="$(fc-match -f '%{file}\n' 'DejaVu Sans:style=Bold' | head -n 1)"
+          FONT_DIR="$(dirname "$FONT_FILE")"
 
-          test -f "$FONT_REGULAR"
-          test -f "$FONT_BOLD"
+          test -n "$FONT_FILE"
+          test -f "$FONT_FILE"
+          test -d "$FONT_DIR"
 
           echo "======================================"
           echo "AICAP RENDER ENVIRONMENT"
           echo "======================================"
-          echo "FFmpeg : $(ffmpeg -version | head -n 1)"
-          echo "ffprobe: $(ffprobe -version | head -n 1)"
-          echo "Regular: $FONT_REGULAR"
-          echo "Bold   : $FONT_BOLD"
+          echo "FFmpeg   : $(ffmpeg -version | head -n 1)"
+          echo "ffprobe  : $(ffprobe -version | head -n 1)"
+          echo "Font     : $FONT_FILE"
+          echo "Font dir : $FONT_DIR"
           echo "======================================"
 
 
@@ -514,7 +517,7 @@ jobs:
                   "MarginV, Encoding"
               ),
               (
-                  "Style: AICAP,Liberation Sans," +
+                  "Style: AICAP,DejaVu Sans," +
                   str(subtitle_size) +
                   ",&H00FFFFFF,&H00FFFFFF," +
                   "&H80000000,&H80000000,-1,0,0,0," +
@@ -840,11 +843,35 @@ jobs:
           #
           # Burn global ASS subtitles and add the real narration.
           # --------------------------------------------------------
+          font_file_result = subprocess.run(
+              [
+                  "fc-match",
+                  "-f",
+                  "%{file}\n",
+                  "DejaVu Sans:style=Bold"
+              ],
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True
+          )
+
+          if font_file_result.returncode != 0:
+              fail(
+                  "fontconfig could not resolve DejaVu Sans Bold\n" +
+                  font_file_result.stdout
+              )
+
+          font_file = font_file_result.stdout.strip().splitlines()[0]
+          font_dir = str(Path(font_file).parent)
+
+          if not Path(font_file).is_file():
+              fail("Resolved subtitle font does not exist: " + font_file)
+
           subtitle_filter = (
               "subtitles=" +
               str(ass_path) +
-              ":fontsdir="
-              "/usr/share/fonts/truetype/liberation2"
+              ":fontsdir=" +
+              font_dir
           )
 
           run(
