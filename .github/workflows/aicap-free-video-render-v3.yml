@@ -8,45 +8,29 @@ on:
         required: true
         type: string
 
-      video_id:
-        description: "AICAP video ID"
-        required: true
-        type: string
-
-      narration_file_id:
-        description: "Google Drive narration file ID"
-        required: true
-        type: string
-
-      scene_config:
-        description: "Scene configuration JSON"
-        required: true
-        type: string
-
-      output_file_name:
-        description: "Output video filename"
-        required: true
-        default: "aicap-final-video.mp4"
-        type: string
-
 jobs:
-
   render:
-
     runs-on: ubuntu-latest
 
     steps:
 
-      # ---------------------------------------------------------
+      # ============================================================
       # 1. CHECKOUT
-      # ---------------------------------------------------------
-      - name: Checkout repository
+      # ============================================================
+      - name: Checkout renderer
         uses: actions/checkout@v4
 
 
-      # ---------------------------------------------------------
+      # ============================================================
       # 2. INSTALL FFMPEG + FONTS
-      # ---------------------------------------------------------
+      #
+      # IMPORTANT:
+      # Do NOT hard-code:
+      # /usr/share/fonts/truetype/liberation2/...
+      #
+      # Ubuntu runner font locations can differ.
+      # We discover the actual installed font path.
+      # ============================================================
       - name: Install FFmpeg and fonts
         shell: bash
         run: |
@@ -56,335 +40,844 @@ jobs:
 
           sudo apt-get install -y \
             ffmpeg \
-            fonts-liberation
+            fonts-liberation \
+            fontconfig
 
-          echo "FFmpeg : $(command -v ffmpeg)"
-          echo "ffprobe: $(command -v ffprobe)"
-
-          # Ubuntu 24.04 / GitHub runner path
-          FONT="/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-
-          # Fallback detection in case runner path changes
-          if [ ! -f "$FONT" ]; then
-            FONT="$(find /usr/share/fonts -type f \
-              \( -iname 'LiberationSans-Bold.ttf' \
-              -o -iname 'LiberationSans-Bold.otf' \) \
-              | head -n 1 || true)"
-          fi
-
-          if [ -z "${FONT:-}" ] || [ ! -f "$FONT" ]; then
-            echo "ERROR: Liberation Sans Bold font not found."
-            echo "Available Liberation fonts:"
-            find /usr/share/fonts -type f \
-              \( -iname '*LiberationSans*' -o -iname '*Liberation*' \) \
-              | sort || true
-            exit 1
-          fi
-
-          echo "Using subtitle font: $FONT"
-
-          # Export for all later steps
-          echo "AICAP_SUBTITLE_FONT=$FONT" >> "$GITHUB_ENV"
-
-          echo "FFmpeg : AVAILABLE"
-          echo "ffprobe: AVAILABLE"
-          echo "Font   : AVAILABLE"
-
-
-      # ---------------------------------------------------------
-      # 3. VALIDATE REQUIRED INPUTS
-      # ---------------------------------------------------------
-      - name: Validate render inputs
-        shell: bash
-        env:
-          JOB_ID: ${{ inputs.job_id }}
-          VIDEO_ID: ${{ inputs.video_id }}
-          NARRATION_FILE_ID: ${{ inputs.narration_file_id }}
-          SCENE_CONFIG: ${{ inputs.scene_config }}
-          OUTPUT_FILE_NAME: ${{ inputs.output_file_name }}
-        run: |
-          set -euo pipefail
-
-          test -n "$JOB_ID"
-          test -n "$VIDEO_ID"
-          test -n "$NARRATION_FILE_ID"
-          test -n "$SCENE_CONFIG"
-          test -n "$OUTPUT_FILE_NAME"
-
-          echo "AICAP Render Job"
-          echo "----------------------------"
-          echo "Job ID       : $JOB_ID"
-          echo "Video ID     : $VIDEO_ID"
-          echo "Narration ID : $NARRATION_FILE_ID"
-          echo "Output       : $OUTPUT_FILE_NAME"
-          echo "Font         : $AICAP_SUBTITLE_FONT"
-          echo "----------------------------"
-
-
-      # ---------------------------------------------------------
-      # 4. CREATE JOB DIRECTORY
-      # ---------------------------------------------------------
-      - name: Prepare render workspace
-        shell: bash
-        env:
-          JOB_ID: ${{ inputs.job_id }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p "aicap-render-jobs/$JOB_ID"
-          mkdir -p "aicap-render-jobs/$JOB_ID/images"
-          mkdir -p "aicap-render-jobs/$JOB_ID/output"
-
-          echo "Workspace prepared:"
-          find "aicap-render-jobs/$JOB_ID" -maxdepth 2 -type d | sort
-
-
-      # ---------------------------------------------------------
-      # 5. WRITE SCENE CONFIG
-      # ---------------------------------------------------------
-      - name: Write scene configuration
-        shell: bash
-        env:
-          JOB_ID: ${{ inputs.job_id }}
-          SCENE_CONFIG: ${{ inputs.scene_config }}
-        run: |
-          set -euo pipefail
-
-          CONFIG="aicap-render-jobs/$JOB_ID/scene_config.json"
-
-          printf '%s' "$SCENE_CONFIG" > "$CONFIG"
-
-          echo "Scene configuration written:"
-          cat "$CONFIG"
-
-          # Validate JSON with Python.
-          python3 - "$CONFIG" <<'PY'
-          import json
-          import sys
-
-          path = sys.argv[1]
-
-          with open(path, "r", encoding="utf-8") as f:
-              data = json.load(f)
-
-          print("scene_config.json : VALID JSON")
-
-          if isinstance(data, dict):
-              print("Configuration type: OBJECT")
-          elif isinstance(data, list):
-              print("Configuration type: ARRAY")
-          else:
-              raise SystemExit("ERROR: Invalid scene configuration root")
-
-          print("JSON validation successful.")
-          PY
-
-
-      # ---------------------------------------------------------
-      # 6. DISPLAY RENDER ENVIRONMENT
-      # ---------------------------------------------------------
-      - name: Verify render environment
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "======================================"
-          echo "AICAP RENDER ENVIRONMENT"
-          echo "======================================"
+          command -v ffmpeg
+          command -v ffprobe
 
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
-          echo "Subtitle font:"
-          echo "$AICAP_SUBTITLE_FONT"
-
-          test -f "$AICAP_SUBTITLE_FONT"
-
           echo "======================================"
-          echo "ENVIRONMENT READY"
+          echo "AICAP FONT DISCOVERY"
           echo "======================================"
 
+          fc-cache -f
 
-      # ---------------------------------------------------------
-      # 7. FIND RENDERER
-      # ---------------------------------------------------------
-      - name: Locate renderer
-        shell: bash
-        run: |
-          set -euo pipefail
+          FONT="$(fc-match -f '%{file}\n' 'Liberation Sans:style=Bold' | head -n 1)"
 
-          echo "Searching for AICAP renderer..."
-
-          find . -maxdepth 4 -type f \
-            \( -name '*.py' -o -name '*.sh' \) \
-            | sort
-
-          echo "Renderer discovery complete."
-
-
-      # ---------------------------------------------------------
-      # 8. RENDER
-      # ---------------------------------------------------------
-      #
-      # IMPORTANT:
-      # The existing AICAP renderer is invoked here.
-      #
-      # If your repository already contains render.py,
-      # this block uses it.
-      #
-      # ---------------------------------------------------------
-      - name: Render AICAP video
-        shell: bash
-        env:
-          JOB_ID: ${{ inputs.job_id }}
-          VIDEO_ID: ${{ inputs.video_id }}
-          NARRATION_FILE_ID: ${{ inputs.narration_file_id }}
-          SCENE_CONFIG: ${{ inputs.scene_config }}
-          OUTPUT_FILE_NAME: ${{ inputs.output_file_name }}
-        run: |
-          set -euo pipefail
-
-          JOB_DIR="aicap-render-jobs/$JOB_ID"
-          CONFIG="$JOB_DIR/scene_config.json"
-          OUTPUT="$JOB_DIR/output/$OUTPUT_FILE_NAME"
-
-          echo "======================================"
-          echo "AICAP REAL VIDEO RENDER"
-          echo "======================================"
-          echo "Job ID       : $JOB_ID"
-          echo "Video ID     : $VIDEO_ID"
-          echo "Narration ID : $NARRATION_FILE_ID"
-          echo "Config       : $CONFIG"
-          echo "Output       : $OUTPUT"
-          echo "Font         : $AICAP_SUBTITLE_FONT"
-          echo "======================================"
-
-          # Do not execute JSON as Python.
-          # scene_config.json is JSON and is loaded with json.load().
-          python3 - "$CONFIG" <<'PY'
-          import json
-          import sys
-
-          config_path = sys.argv[1]
-
-          with open(config_path, "r", encoding="utf-8") as f:
-              config = json.load(f)
-
-          print("Scene configuration successfully parsed.")
-
-          if isinstance(config, dict):
-              scenes = config.get("scenes", [])
-              print("Scene count:", len(scenes))
-          elif isinstance(config, list):
-              print("Scene count:", len(config))
-          PY
-
-          echo "Renderer execution begins after configuration validation."
-
-          # ----------------------------------------------------
-          # Locate the existing renderer.
-          # ----------------------------------------------------
-          RENDERER=""
-
-          if [ -f "./render.py" ]; then
-            RENDERER="./render.py"
-          elif [ -f "./renderer.py" ]; then
-            RENDERER="./renderer.py"
-          elif [ -f "./aicap-renderer.py" ]; then
-            RENDERER="./aicap-renderer.py"
-          elif [ -f "./aicap_renderer.py" ]; then
-            RENDERER="./aicap_renderer.py"
+          if [ -z "$FONT" ] || [ ! -f "$FONT" ]; then
+            FONT="$(find /usr/share/fonts -type f \
+              \( \
+                -iname 'LiberationSans-Bold.ttf' \
+                -o \
+                -iname 'LiberationSans-Bold.otf' \
+              \) \
+              | head -n 1)"
           fi
 
-          if [ -n "$RENDERER" ]; then
-            echo "Renderer found: $RENDERER"
-
-            python3 "$RENDERER" \
-              --job-id "$JOB_ID" \
-              --video-id "$VIDEO_ID" \
-              --narration-file-id "$NARRATION_FILE_ID" \
-              --scene-config "$CONFIG" \
-              --output "$OUTPUT" \
-              --font "$AICAP_SUBTITLE_FONT"
-
-          else
-            echo "No standalone renderer.py found."
-            echo "Checking repository for render implementation..."
-
-            find . -type f \
-              \( -name '*.py' -o -name '*.sh' \) \
-              | sort
-
+          if [ -z "$FONT" ] || [ ! -f "$FONT" ]; then
+            echo "ERROR: Liberation Sans Bold font could not be located."
             echo ""
-            echo "ERROR: AICAP renderer entry point was not found."
-            echo "The environment and JSON configuration are valid."
+            echo "Available Liberation fonts:"
+            find /usr/share/fonts -type f \
+              \( -iname '*Liberation*' -o -iname '*Arial*' \) \
+              | sort || true
             exit 1
           fi
 
+          echo "FFmpeg : AVAILABLE"
+          echo "ffprobe: AVAILABLE"
+          echo "Font   : $FONT"
 
-      # ---------------------------------------------------------
-      # 9. VERIFY OUTPUT
-      # ---------------------------------------------------------
-      - name: Verify rendered video
+          echo "AICAP_FONT=$FONT" >> "$GITHUB_ENV"
+
+          echo "======================================"
+          echo "FONT DISCOVERY : SUCCESS"
+          echo "======================================"
+
+
+      # ============================================================
+      # 3. LOCATE RENDER JOB
+      # ============================================================
+      - name: Locate render job
+        id: locate
         shell: bash
         env:
           JOB_ID: ${{ inputs.job_id }}
-          OUTPUT_FILE_NAME: ${{ inputs.output_file_name }}
         run: |
           set -euo pipefail
 
-          OUTPUT="aicap-render-jobs/$JOB_ID/output/$OUTPUT_FILE_NAME"
+          ROOT="aicap-render-jobs/${JOB_ID}"
 
           echo "======================================"
-          echo "AICAP OUTPUT VERIFICATION"
+          echo "AICAP RENDER JOB"
+          echo "======================================"
+          echo "Job ID : ${JOB_ID}"
+          echo "Root   : ${ROOT}"
           echo "======================================"
 
-          test -f "$OUTPUT"
-          test -s "$OUTPUT"
+          test -d "$ROOT"
+          test -f "$ROOT/scene_config.json"
+          test -s "$ROOT/narration.mp3"
 
-          echo "Output file:"
-          ls -lh "$OUTPUT"
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
+          echo "Render package located successfully."
+
+
+      # ============================================================
+      # 4. VALIDATE JSON RENDER PACKAGE
+      #
+      # CRITICAL:
+      # scene_config.json is JSON DATA.
+      #
+      # It is NEVER executed as Python.
+      #
+      # Therefore JSON values such as:
+      #
+      #     true
+      #     false
+      #     null
+      #
+      # remain valid JSON.
+      # ============================================================
+      - name: Validate render package
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          CFG="$ROOT/scene_config.json"
+
+          echo "======================================"
+          echo "AICAP JSON VALIDATION"
+          echo "======================================"
+
+          python3 - "$CFG" "$ROOT" <<'PY'
+          import json
+          import os
+          import sys
+
+          cfg_path = sys.argv[1]
+          root = sys.argv[2]
+
+          print(f"Config : {cfg_path}")
+          print(f"Root   : {root}")
+
+          # --------------------------------------------------------
+          # IMPORTANT:
+          # JSON is opened as DATA.
+          # It is NOT executed as Python.
+          # --------------------------------------------------------
+          with open(cfg_path, "r", encoding="utf-8") as f:
+              cfg = json.load(f)
+
+          if not isinstance(cfg, dict):
+              raise SystemExit(
+                  "scene_config.json root must be an object"
+              )
+
+          scenes = cfg.get("scenes")
+
+          if not isinstance(scenes, list) or not scenes:
+              raise SystemExit(
+                  "scene_config.json contains no scenes"
+              )
+
+          fps = int(cfg.get("fps", 30))
+          width = int(cfg.get("width", 1080))
+          height = int(cfg.get("height", 1920))
+
+          if fps <= 0:
+              raise SystemExit("Invalid FPS")
+
+          if width <= 0 or height <= 0:
+              raise SystemExit("Invalid render dimensions")
+
+          previous_end = 0.0
+
+          allowed_motion = {
+              "zoom_in",
+              "zoom_out",
+              "pan_left",
+              "pan_right",
+          }
+
+          for index, scene in enumerate(scenes, 1):
+
+              if not isinstance(scene, dict):
+                  raise SystemExit(
+                      f"Scene {index} is not an object"
+                  )
+
+              try:
+                  start = float(scene["start"])
+                  end = float(scene["end"])
+              except (KeyError, TypeError, ValueError) as exc:
+                  raise SystemExit(
+                      f"Invalid timing in scene {index}: {exc}"
+                  )
+
+              if start < 0:
+                  raise SystemExit(
+                      f"Scene {index} has negative start time"
+                  )
+
+              if end <= start:
+                  raise SystemExit(
+                      f"Invalid timing in scene {index}: "
+                      f"end <= start"
+                  )
+
+              if abs(start - previous_end) > 0.001:
+                  raise SystemExit(
+                      f"Timeline gap/overlap before scene {index}: "
+                      f"{start} != {previous_end}"
+                  )
+
+              filename = (
+                  scene.get("filename")
+                  or f"scene_{index:02d}.jpg"
+              )
+
+              image_path = os.path.join(
+                  root,
+                  filename
+              )
+
+              if not os.path.isfile(image_path):
+                  raise SystemExit(
+                      f"Missing scene image: {image_path}"
+                  )
+
+              motion = scene.get("motion", "")
+
+              if motion and motion not in allowed_motion:
+                  print(
+                      f"WARNING: unsupported motion in scene "
+                      f"{index}; renderer fallback will be used"
+                  )
+
+              subtitle = scene.get("subtitle") or {}
+
+              if subtitle.get("enabled"):
+                  text = str(
+                      subtitle.get("text", "")
+                  ).strip()
+
+                  if not text:
+                      raise SystemExit(
+                          f"Scene {index} subtitles enabled "
+                          f"but subtitle text is empty"
+                      )
+
+              previous_end = end
+
+          narration = os.path.join(
+              root,
+              "narration.mp3"
+          )
+
+          if not os.path.isfile(narration):
+              raise SystemExit(
+                  "Missing narration.mp3"
+              )
+
+          print("")
+          print("JSON validation : SUCCESS")
+          print(f"Scenes          : {len(scenes)}")
+          print(f"Resolution      : {width}x{height}")
+          print(f"FPS             : {fps}")
+          print(f"Duration        : {previous_end:.3f}s")
+          print("")
+
+
+      # ============================================================
+      # 5. REAL FFMPEG RENDER
+      #
+      # JSON is loaded using json.load().
+      #
+      # Font is supplied through AICAP_FONT discovered earlier.
+      #
+      # Motion:
+      #   zoom_in
+      #   zoom_out
+      #   pan_left
+      #   pan_right
+      #
+      # Subtitle:
+      #   drawtext
+      #
+      # Transition:
+      #   fade in/out
+      #
+      # Audio:
+      #   continuous narration.mp3
+      # ============================================================
+      - name: Render video
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+          AICAP_FONT: ${{ env.AICAP_FONT }}
+        run: |
+          set -euo pipefail
+
+          CFG="$ROOT/scene_config.json"
+          AUDIO="$ROOT/narration.mp3"
+          OUT="$ROOT/aicap_final.mp4"
+
+          test -s "$CFG"
+          test -s "$AUDIO"
+
+          if [ -z "${AICAP_FONT:-}" ] || [ ! -f "$AICAP_FONT" ]; then
+            echo "ERROR: AICAP_FONT is invalid."
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "AICAP REAL FFMPEG RENDER"
+          echo "======================================"
+          echo "Config : $CFG"
+          echo "Audio  : $AUDIO"
+          echo "Font   : $AICAP_FONT"
+          echo "Output : $OUT"
+          echo "======================================"
+
+          python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" "$AICAP_FONT" > /tmp/aicap_render.sh <<'PY'
+          import json
+          import os
+          import shlex
+          import sys
+
+          cfg_path, root, audio, out, font = sys.argv[1:6]
+
+          # --------------------------------------------------------
+          # JSON DATA PARSING
+          # --------------------------------------------------------
+          with open(cfg_path, "r", encoding="utf-8") as f:
+              cfg = json.load(f)
+
+          scenes = cfg.get("scenes")
+
+          if not isinstance(scenes, list) or not scenes:
+              raise SystemExit(
+                  "scene_config.json contains no scenes"
+              )
+
+          fps = int(cfg.get("fps", 30))
+          width = int(cfg.get("width", 1080))
+          height = int(cfg.get("height", 1920))
+
+          if fps <= 0:
+              raise SystemExit("Invalid FPS")
+
+          if width <= 0 or height <= 0:
+              raise SystemExit(
+                  "Invalid render dimensions"
+              )
+
+          if not os.path.isfile(font):
+              raise SystemExit(
+                  f"Subtitle font not found: {font}"
+              )
+
+          if not os.path.isfile(audio):
+              raise SystemExit(
+                  f"Narration not found: {audio}"
+              )
+
+          def q(value):
+              return shlex.quote(str(value))
+
+          inputs = []
+          filters = []
+          labels = []
+
+          motions = (
+              "zoom_in",
+              "zoom_out",
+              "pan_left",
+              "pan_right",
+          )
+
+          for i, scene in enumerate(scenes):
+
+              filename = (
+                  scene.get("filename")
+                  or f"scene_{i + 1:02d}.jpg"
+              )
+
+              image = os.path.join(
+                  root,
+                  filename
+              )
+
+              if not os.path.isfile(image):
+                  raise SystemExit(
+                      f"Missing scene image: {image}"
+                  )
+
+              start = float(scene["start"])
+              end = float(scene["end"])
+              duration = end - start
+
+              if duration <= 0:
+                  raise SystemExit(
+                      f"Invalid duration for scene {i + 1}"
+                  )
+
+              motion = scene.get("motion", "")
+
+              if motion not in motions:
+                  motion = motions[i % len(motions)]
+
+              frames = max(
+                  1,
+                  int(round(duration * fps))
+              )
+
+              # ----------------------------------------------------
+              # IMAGE INPUT
+              # ----------------------------------------------------
+              inputs += [
+                  "-loop",
+                  "1",
+                  "-framerate",
+                  str(fps),
+                  "-t",
+                  f"{duration:.6f}",
+                  "-i",
+                  image,
+              ]
+
+              # ----------------------------------------------------
+              # MOTION
+              # ----------------------------------------------------
+              if motion == "zoom_in":
+
+                  vf = (
+                      f"scale={width * 2}:{height * 2}:"
+                      f"force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:{height * 2},"
+                      f"zoompan="
+                      f"z='min(zoom+0.0007,1.12)':"
+                      f"x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
+                  )
+
+              elif motion == "zoom_out":
+
+                  vf = (
+                      f"scale={width * 2}:{height * 2}:"
+                      f"force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:{height * 2},"
+                      f"zoompan="
+                      f"z='if(lte(on,1),1.12,max(1.0,zoom-0.0007))':"
+                      f"x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
+                  )
+
+              elif motion == "pan_left":
+
+                  vf = (
+                      f"scale={width * 2}:{height * 2}:"
+                      f"force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:{height * 2},"
+                      f"zoompan="
+                      f"z='1.08':"
+                      f"x='(iw-iw/zoom)*"
+                      f"min(on/max(1,{frames}),1)':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
+                  )
+
+              else:
+
+                  vf = (
+                      f"scale={width * 2}:{height * 2}:"
+                      f"force_original_aspect_ratio=increase,"
+                      f"crop={width * 2}:{height * 2},"
+                      f"zoompan="
+                      f"z='1.08':"
+                      f"x='(iw-iw/zoom)*(1-"
+                      f"min(on/max(1,{frames}),1))':"
+                      f"y='ih/2-(ih/zoom/2)':"
+                      f"d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
+                  )
+
+              # ----------------------------------------------------
+              # SUBTITLE
+              # ----------------------------------------------------
+              subtitle = scene.get("subtitle") or {}
+
+              if subtitle.get("enabled"):
+
+                  text = str(
+                      subtitle.get("text", "")
+                  ).replace(
+                      "\r\n",
+                      "\n"
+                  ).replace(
+                      "\r",
+                      "\n"
+                  ).strip()
+
+                  caption_file = (
+                      f"/tmp/aicap_caption_{i + 1:02d}.txt"
+                  )
+
+                  with open(
+                      caption_file,
+                      "w",
+                      encoding="utf-8"
+                  ) as f:
+                      f.write(text)
+
+                  style = subtitle.get("style") or {}
+
+                  fontsize = int(
+                      style.get("size", 80)
+                  )
+
+                  outline = int(
+                      style.get("outline", 5)
+                  )
+
+                  shadow = int(
+                      style.get("shadow", 3)
+                  )
+
+                  margin = int(
+                      style.get("margin", 90)
+                  )
+
+                  bottom_margin = max(
+                      100,
+                      margin + 30
+                  )
+
+                  vf += (
+                      f",drawtext="
+                      f"fontfile={q(font)}:"
+                      f"textfile={q(caption_file)}:"
+                      f"fontcolor=white:"
+                      f"fontsize={fontsize}:"
+                      f"x='(w-text_w)/2':"
+                      f"y='h-text_h-{bottom_margin}':"
+                      f"line_spacing=10:"
+                      f"borderw={outline}:"
+                      f"bordercolor=black@0.85:"
+                      f"shadowx={shadow}:"
+                      f"shadowy={shadow}:"
+                      f"shadowcolor=black@0.80:"
+                      f"fix_bounds=1"
+                  )
+
+              # ----------------------------------------------------
+              # FADE TRANSITIONS
+              # ----------------------------------------------------
+              fade_duration = min(
+                  0.5,
+                  max(0.05, duration / 4.0)
+              )
+
+              fade_out_start = max(
+                  0,
+                  duration - fade_duration
+              )
+
+              vf += (
+                  f",fade=t=in:st=0:"
+                  f"d={fade_duration:.6f},"
+                  f"fade=t=out:"
+                  f"st={fade_out_start:.6f}:"
+                  f"d={fade_duration:.6f}"
+              )
+
+              # ----------------------------------------------------
+              # SCENE OUTPUT
+              # ----------------------------------------------------
+              filters.append(
+                  f"[{i}:v]"
+                  f"{vf},"
+                  f"trim=duration={duration:.6f},"
+                  f"setpts=PTS-STARTPTS"
+                  f"[v{i}]"
+              )
+
+              labels.append(
+                  f"[v{i}]"
+              )
+
+          # --------------------------------------------------------
+          # TOTAL TIMELINE
+          # --------------------------------------------------------
+          total_duration = float(
+              scenes[-1]["end"]
+          )
+
+          audio_input_index = len(scenes)
+
+          filters.append(
+              "".join(labels)
+              +
+              f"concat=n={len(scenes)}:v=1:a=0,"
+              f"trim=duration={total_duration:.6f},"
+              f"setpts=PTS-STARTPTS[v]"
+          )
+
+          # --------------------------------------------------------
+          # FFMPEG COMMAND
+          # --------------------------------------------------------
+          cmd = [
+              "ffmpeg",
+              "-y",
+              "-hide_banner",
+              "-loglevel",
+              "error",
+          ]
+
+          cmd += inputs
+
+          cmd += [
+              "-i",
+              audio,
+
+              "-filter_complex",
+              ";".join(filters),
+
+              "-map",
+              "[v]",
+
+              "-map",
+              f"{audio_input_index}:a",
+
+              "-c:v",
+              "libx264",
+
+              "-preset",
+              "medium",
+
+              "-crf",
+              "20",
+
+              "-pix_fmt",
+              "yuv420p",
+
+              "-r",
+              str(fps),
+
+              "-c:a",
+              "aac",
+
+              "-b:a",
+              "192k",
+
+              "-t",
+              f"{total_duration:.6f}",
+
+              "-af",
+              "aresample=async=1:first_pts=0",
+
+              "-movflags",
+              "+faststart",
+
+              out,
+          ]
+
+          print(
+              " ".join(
+                  q(value)
+                  for value in cmd
+              )
+          )
+          PY
+
+          chmod +x /tmp/aicap_render.sh
+
+          /tmp/aicap_render.sh | bash
+
+          test -s "$OUT"
 
           echo ""
-          echo "FFprobe verification:"
+          echo "======================================"
+          echo "AICAP FFMPEG RENDER : SUCCESS"
+          echo "======================================"
+          echo "Output : $OUT"
+          echo "======================================"
+
+
+      # ============================================================
+      # 6. FINAL OUTPUT VERIFICATION
+      # ============================================================
+      - name: Verify output
+        shell: bash
+        env:
+          ROOT: ${{ steps.locate.outputs.root }}
+        run: |
+          set -euo pipefail
+
+          OUT="$ROOT/aicap_final.mp4"
+
+          test -s "$OUT"
+
+          echo "======================================"
+          echo "AICAP FINAL OUTPUT VERIFICATION"
+          echo "======================================"
+
+          echo ""
+          echo "===== VIDEO STREAM ====="
 
           ffprobe \
             -v error \
-            -show_entries format=duration,size \
-            -show_entries stream=codec_name,width,height \
+            -select_streams v:0 \
+            -show_entries \
+            stream=codec_name,width,height,r_frame_rate,duration \
             -of default=noprint_wrappers=1 \
-            "$OUTPUT"
+            "$OUT"
 
           echo ""
-          echo "VIDEO OUTPUT VERIFIED"
+          echo "===== AUDIO STREAM ====="
+
+          ffprobe \
+            -v error \
+            -select_streams a:0 \
+            -show_entries \
+            stream=codec_name,sample_rate,channels,duration \
+            -of default=noprint_wrappers=1 \
+            "$OUT"
+
+          WIDTH="$(
+            ffprobe \
+              -v error \
+              -select_streams v:0 \
+              -show_entries stream=width \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
+          HEIGHT="$(
+            ffprobe \
+              -v error \
+              -select_streams v:0 \
+              -show_entries stream=height \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
+          AUDIO_CODEC="$(
+            ffprobe \
+              -v error \
+              -select_streams a:0 \
+              -show_entries stream=codec_name \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
+          VIDEO_DURATION="$(
+            ffprobe \
+              -v error \
+              -select_streams v:0 \
+              -show_entries stream=duration \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
+          AUDIO_DURATION="$(
+            ffprobe \
+              -v error \
+              -select_streams a:0 \
+              -show_entries stream=duration \
+              -of csv=p=0 \
+              "$OUT"
+          )"
+
+          test "$WIDTH" = "1080"
+          test "$HEIGHT" = "1920"
+          test "$AUDIO_CODEC" = "aac"
+
+          python3 \
+            "$VIDEO_DURATION" \
+            "$AUDIO_DURATION" <<'PY'
+
+          import sys
+
+          video = float(sys.argv[1])
+          audio = float(sys.argv[2])
+
+          if video < audio - 0.20:
+              raise SystemExit(
+                  f"Rendered video is shorter than audio: "
+                  f"video={video:.3f}s "
+                  f"audio={audio:.3f}s"
+              )
+
+          print(
+              f"Duration verified: "
+              f"video={video:.3f}s "
+              f"audio={audio:.3f}s"
+          )
+
+          PY
+
+          echo ""
+          echo "======================================"
+          echo "FINAL VERIFICATION : SUCCESS"
+          echo "======================================"
+          echo "Resolution : ${WIDTH}x${HEIGHT}"
+          echo "Audio      : ${AUDIO_CODEC}"
+          echo "Video      : ${VIDEO_DURATION}s"
+          echo "Audio      : ${AUDIO_DURATION}s"
+          echo "======================================"
 
 
-      # ---------------------------------------------------------
-      # 10. UPLOAD RESULT
-      # ---------------------------------------------------------
-      - name: Upload rendered video
-        uses: actions/upload-artifact@v4
-        with:
-          name: aicap-render-${{ inputs.job_id }}
-          path: aicap-render-jobs/${{ inputs.job_id }}/output/
-          if-no-files-found: error
-
-
-      # ---------------------------------------------------------
-      # 11. SUCCESS
-      # ---------------------------------------------------------
-      - name: Render completed
+      # ============================================================
+      # 7. PACKAGE ARTIFACT
+      # ============================================================
+      - name: Package render artifact
         shell: bash
         env:
-          JOB_ID: ${{ inputs.job_id }}
-          VIDEO_ID: ${{ inputs.video_id }}
+          ROOT: ${{ steps.locate.outputs.root }}
         run: |
           set -euo pipefail
 
-          echo "======================================"
-          echo "AICAP RENDER SUCCESS"
-          echo "======================================"
-          echo "Job ID   : $JOB_ID"
-          echo "Video ID : $VIDEO_ID"
-          echo "Status   : SUCCESS"
-          echo "======================================"
+          mkdir -p artifact
+
+          cp \
+            "$ROOT/aicap_final.mp4" \
+            artifact/aicap_final.mp4
+
+          cp \
+            "$ROOT/scene_config.json" \
+            artifact/scene_config.json
+
+          cp \
+            "$ROOT/narration.mp3" \
+            artifact/narration.mp3
+
+          find "$ROOT" \
+            -maxdepth 1 \
+            -type f \
+            \( \
+              -name "*.jpg" \
+              -o -name "*.jpeg" \
+              -o -name "*.png" \
+            \) \
+            -exec cp {} artifact/ \;
+
+          echo "Artifact package prepared."
+
+
+      # ============================================================
+      # 8. UPLOAD FINAL ARTIFACT
+      # ============================================================
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aicap-render-${{ inputs.job_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 7
