@@ -1,0 +1,248 @@
+{
+  "project": {
+    "name": "AICAP-03ce91b0e43447bfb9c6",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 42.624
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/narration.mp3",
+    "mode": "timeline_sync",
+    "segments": [
+      {
+        "id": 1,
+        "start": 0,
+        "duration": 5.808,
+        "end": 5.808
+      },
+      {
+        "id": 2,
+        "start": 5.808,
+        "duration": 5.856,
+        "end": 11.664
+      },
+      {
+        "id": 3,
+        "start": 11.664,
+        "duration": 10.008,
+        "end": 21.672
+      },
+      {
+        "id": 4,
+        "start": 21.672,
+        "duration": 5.064,
+        "end": 26.736
+      },
+      {
+        "id": 5,
+        "start": 26.736,
+        "duration": 10.104,
+        "end": 36.84
+      },
+      {
+        "id": 6,
+        "start": 36.84,
+        "duration": 5.784,
+        "end": 42.624
+      }
+    ]
+  },
+  "timing": {
+    "mode": "AUDIO_DRIVEN",
+    "scene_count": 6,
+    "requested_duration": 42.624,
+    "scene_duration_total": 42.624,
+    "duration_difference": 0,
+    "authoritative": "SCENE_DURATIONS"
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_01.jpg",
+      "start": 0,
+      "duration": 5.808,
+      "end": 5.808,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "start": 0,
+        "end": 5.808,
+        "duration": 5.808,
+        "text": "For decades, industrial robotics\nrelied on deterministic code\nwithin controlled environments.",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_02.jpg",
+      "start": 5.808,
+      "duration": 5.856,
+      "end": 11.664,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "start": 5.808,
+        "end": 11.664,
+        "duration": 5.856,
+        "text": "Today, the convergence of\nvision-language-action models\nand advanced tactile sensing is\nchanging everything.",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_03.jpg",
+      "start": 11.664,
+      "duration": 10.008,
+      "end": 21.672,
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "start": 11.664,
+        "end": 21.672,
+        "duration": 10.008,
+        "text": "Modern humanoid robots utilize\nneural networks to map complex\n3D spaces, execute fine-motor\ntasks, and self-correct when…",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 4,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_04.jpg",
+      "start": 21.672,
+      "duration": 5.064,
+      "end": 26.736,
+      "motion": "pan_right",
+      "subtitle": {
+        "enabled": true,
+        "start": 21.672,
+        "end": 26.736,
+        "duration": 5.064,
+        "text": "Companies are moving from basic\npick-and-place dynamics to true\nend-to-end spatial intelligence.",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 5,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_05.jpg",
+      "start": 26.736,
+      "duration": 10.104,
+      "end": 36.84,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "start": 26.736,
+        "end": 36.84,
+        "duration": 10.104,
+        "text": "As hardware components become\nlighter, stronger, and more\nenergy-efficient, the gap\nbetween simulation and…",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 6,
+      "image": "aicap-render-jobs/AICAP-03ce91b0e43447bfb9c6/scene_06.jpg",
+      "start": 36.84,
+      "duration": 5.784,
+      "end": 42.624,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "start": 36.84,
+        "end": 42.624,
+        "duration": 5.784,
+        "text": "This transition will redefine\nmanufacturing, logistics, and\neventually household assistance.",
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    }
+  ]
+}
