@@ -1,0 +1,169 @@
+{
+  "project": {
+    "name": "AICAP-426c97a471f94b08b4a5",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 41.496,
+    "format": "mp4"
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/narration.mp3",
+    "mode": "timeline_sync",
+    "suppliedBy": "MODULE_17",
+    "generatedByModule20": false
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "start": 0,
+      "end": 5.7,
+      "duration": 5.7,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_01.jpg",
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "For decades, industrial robotics\nrelied on deterministic code\nwithin controlled environments.",
+        "start": 0,
+        "end": 5.7,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    },
+    {
+      "id": 2,
+      "start": 5.7,
+      "end": 12.002,
+      "duration": 6.302,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_02.jpg",
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "Today, the convergence of\nvision-language-action models\nand advanced tactile sensing is\nchanging everything.",
+        "start": 5.7,
+        "end": 12.002,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    },
+    {
+      "id": 3,
+      "start": 12.002,
+      "end": 21.2,
+      "duration": 9.198,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_03.jpg",
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "text": "Modern humanoid robots utilize\nneural networks to map complex\n3D spaces, execute fine-motor\ntasks, and self-correct when…",
+        "start": 12.002,
+        "end": 21.2,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    },
+    {
+      "id": 4,
+      "start": 21.2,
+      "end": 26.668,
+      "duration": 5.468,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_04.jpg",
+      "motion": "pan_right",
+      "subtitle": {
+        "enabled": true,
+        "text": "Companies are moving from basic\npick-and-place dynamics to true\nend-to-end spatial intelligence.",
+        "start": 21.2,
+        "end": 26.668,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    },
+    {
+      "id": 5,
+      "start": 26.668,
+      "end": 36.144,
+      "duration": 9.476,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_05.jpg",
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "As hardware components become\nlighter, stronger, and more\nenergy-efficient, the gap\nbetween simulation and…",
+        "start": 26.668,
+        "end": 36.144,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    },
+    {
+      "id": 6,
+      "start": 36.144,
+      "end": 41.496,
+      "duration": 5.352,
+      "image": "aicap-render-jobs/AICAP-426c97a471f94b08b4a5/scene_06.jpg",
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "This transition will redefine\nmanufacturing, logistics, and\neventually household assistance.",
+        "start": 36.144,
+        "end": 41.496,
+        "font": "Arial",
+        "size": 80,
+        "color": "#FFFFFF",
+        "bold": true,
+        "italic": false,
+        "x": 540,
+        "y": 1580,
+        "outline": 5,
+        "shadow": 3,
+        "margin": 90
+      }
+    }
+  ]
+}
