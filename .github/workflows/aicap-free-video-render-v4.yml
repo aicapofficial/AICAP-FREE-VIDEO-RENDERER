@@ -25,8 +25,13 @@ jobs:
       # 2. INSTALL FFMPEG + FONTS
       #
       # IMPORTANT:
-      # Do NOT use grep against ffmpeg -filters here.
-      # FFmpeg itself is the authoritative test.
+      # Do not validate subtitle filters with grep here.
+      # The previous V4 failure occurred because that validation
+      # command returned exit code 1 even though FFmpeg itself was
+      # installed successfully.
+      #
+      # The real subtitles filter is validated when the final video
+      # is rendered.
       # ============================================================
       - name: Install FFmpeg and fonts
         shell: bash
@@ -37,20 +42,14 @@ jobs:
 
           sudo apt-get install -y \
             ffmpeg \
-            fonts-liberation \
-            fontconfig
+            fontconfig \
+            fonts-dejavu
 
           command -v ffmpeg
           command -v ffprobe
           command -v fc-match
 
-          FONT_FILE="$(
-            fc-match \
-              -f '%{file}\n' \
-              'Liberation Sans:style=Bold' \
-              | head -n 1
-          )"
-
+          FONT_FILE="$(fc-match -f '%{file}\n' 'DejaVu Sans:style=Bold' | head -n 1)"
           FONT_DIR="$(dirname "$FONT_FILE")"
 
           test -n "$FONT_FILE"
@@ -98,29 +97,24 @@ jobs:
       # 4. RENDER VIDEO
       #
       # scene_config.json is DATA.
+      # It is passed as an argument to Python and parsed with
+      # json.load(). It is never executed as Python source.
       #
-      # It is passed to Python as an argument and parsed with
-      # json.load().
-      #
-      # It is NEVER executed as Python source.
-      #
-      # Pipeline:
-      #
-      # JSON
-      #   ↓
-      # Validate audio-driven timeline
-      #   ↓
-      # Build global ASS subtitles
-      #   ↓
-      # Render each scene independently
-      #   ↓
-      # Concatenate scene clips
-      #   ↓
-      # Apply subtitles
-      #   ↓
-      # Add Module 17 narration
-      #   ↓
-      # Final MP4
+      # Rendering architecture:
+      #   JSON
+      #     ↓
+      #   validate audio-driven timeline
+      #     ↓
+      #   create global ASS subtitles
+      #     ↓
+      #   render each scene independently
+      #     ↓
+      #   concatenate scene clips
+      #     ↓
+      #   final FFmpeg pass:
+      #       ASS subtitles + real narration
+      #     ↓
+      #   aicap_final.mp4
       # ============================================================
       - name: Render video
         shell: bash
@@ -134,18 +128,12 @@ jobs:
           OUT="$ROOT/aicap_final.mp4"
 
           python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" <<'PY'
-
           import json
           import os
           import shlex
           import subprocess
           import sys
           from pathlib import Path
-
-
-          # ============================================================
-          # PATHS
-          # ============================================================
 
           cfg_path = Path(sys.argv[1]).resolve()
           root = Path(sys.argv[2]).resolve()
@@ -155,31 +143,15 @@ jobs:
           WORK = root / "_aicap_work"
           WORK.mkdir(parents=True, exist_ok=True)
 
-
-          # ============================================================
-          # HELPERS
-          # ============================================================
-
           def fail(message):
-              raise SystemExit(
-                  "AICAP RENDER ERROR: " +
-                  str(message)
-              )
-
+              raise SystemExit("AICAP RENDER ERROR: " + str(message))
 
           def run(cmd, label):
-
               print("")
               print("======================================")
               print(label)
               print("======================================")
-
-              print(
-                  " ".join(
-                      shlex.quote(str(x))
-                      for x in cmd
-                  )
-              )
+              print(" ".join(shlex.quote(str(x)) for x in cmd))
 
               result = subprocess.run(
                   [str(x) for x in cmd],
@@ -199,18 +171,13 @@ jobs:
 
               return result
 
-
           def probe_duration(path):
-
               result = subprocess.run(
                   [
                       "ffprobe",
-                      "-v",
-                      "error",
-                      "-show_entries",
-                      "format=duration",
-                      "-of",
-                      "default=noprint_wrappers=1:nokey=1",
+                      "-v", "error",
+                      "-show_entries", "format=duration",
+                      "-of", "default=noprint_wrappers=1:nokey=1",
                       str(path)
                   ],
                   stdout=subprocess.PIPE,
@@ -227,9 +194,7 @@ jobs:
                   )
 
               try:
-                  return float(
-                      result.stdout.strip()
-                  )
+                  return float(result.stdout.strip())
               except Exception:
                   fail(
                       "Could not read duration from " +
@@ -238,41 +203,24 @@ jobs:
                       result.stdout
                   )
 
-
-          # ============================================================
+          # --------------------------------------------------------
           # 1. READ JSON AS JSON DATA
-          # ============================================================
-
+          # --------------------------------------------------------
           try:
-
-              with cfg_path.open(
-                  "r",
-                  encoding="utf-8"
-              ) as f:
-
+              with cfg_path.open("r", encoding="utf-8") as f:
                   cfg = json.load(f)
-
           except Exception as exc:
-
               fail(
                   "Cannot parse scene_config.json as JSON: " +
                   str(exc)
               )
 
-
           if not isinstance(cfg, dict):
-
-              fail(
-                  "scene_config.json root must be an object"
-              )
-
+              fail("scene_config.json root must be an object")
 
           project = cfg.get("project") or {}
 
-          resolution = (
-              project.get("resolution") or {}
-          )
-
+          resolution = project.get("resolution") or {}
 
           width = int(
               resolution.get(
@@ -281,14 +229,12 @@ jobs:
               )
           )
 
-
           height = int(
               resolution.get(
                   "height",
                   cfg.get("height", 1920)
               )
           )
-
 
           fps = int(
               project.get(
@@ -297,142 +243,75 @@ jobs:
               )
           )
 
-
           if width != 1080 or height != 1920:
-
               fail(
                   "Required output is 1080x1920, received " +
                   f"{width}x{height}"
               )
 
-
           if fps != 30:
-
               fail(
                   "Required FPS is 30, received " +
                   str(fps)
               )
 
-
           scenes = cfg.get("scenes")
 
-
-          if (
-              not isinstance(scenes, list)
-              or not scenes
-          ):
-
+          if not isinstance(scenes, list) or not scenes:
               fail(
                   "scene_config.json contains no scenes"
               )
 
-
-          # ============================================================
+          # --------------------------------------------------------
           # 2. AUTHORITATIVE AUDIO-DRIVEN TIMELINE
-          # ============================================================
-
+          # --------------------------------------------------------
           normalized = []
-
           previous_end = 0.0
 
+          for index, scene in enumerate(scenes, 1):
 
-          for index, scene in enumerate(
-              scenes,
-              1
-          ):
-
-              if not isinstance(
-                  scene,
-                  dict
-              ):
-
+              if not isinstance(scene, dict):
                   fail(
                       f"Scene {index} is not an object"
                   )
 
-
               try:
-
-                  start = float(
-                      scene["start"]
-                  )
-
-                  end = float(
-                      scene["end"]
-                  )
-
+                  start = float(scene["start"])
+                  end = float(scene["end"])
               except Exception as exc:
-
                   fail(
-                      f"Scene {index} has invalid "
-                      f"start/end: {exc}"
+                      f"Scene {index} has invalid start/end: {exc}"
                   )
-
 
               if start < -0.001:
-
                   fail(
                       f"Scene {index} starts before zero"
                   )
 
-
               if end <= start:
-
                   fail(
                       f"Scene {index} has end <= start"
                   )
 
-
-              if abs(
-                  start - previous_end
-              ) > 0.01:
-
+              if abs(start - previous_end) > 0.01:
                   fail(
-                      f"Timeline gap/overlap before "
-                      f"scene {index}: "
-                      f"{start:.3f} != "
-                      f"{previous_end:.3f}"
+                      f"Timeline gap/overlap before scene {index}: "
+                      f"{start:.3f} != {previous_end:.3f}"
                   )
-
 
               filename = str(
                   scene.get("filename") or
                   f"scene_{index:02d}.jpg"
               ).strip()
 
+              image = (root / filename).resolve()
 
-              image = (
-                  root /
-                  filename
-              ).resolve()
-
-
-              if (
-                  not image.is_file()
-                  or image.stat().st_size == 0
-              ):
-
+              if not image.is_file() or image.stat().st_size == 0:
                   fail(
-                      "Missing/empty scene image: " +
-                      str(image)
+                      f"Missing/empty scene image: {image}"
                   )
 
-
               duration = end - start
-
-
-              subtitle_value = (
-                  scene.get("subtitle") or {}
-              )
-
-
-              if not isinstance(
-                  subtitle_value,
-                  dict
-              ):
-
-                  subtitle_value = {}
-
 
               normalized.append(
                   {
@@ -445,120 +324,70 @@ jobs:
                       "motion": str(
                           scene.get("motion") or ""
                       ).strip(),
-                      "subtitle": subtitle_value
+                      "subtitle": (
+                          scene.get("subtitle") or {}
+                      )
                   }
               )
 
-
               previous_end = end
 
-
-          total_duration = float(
-              previous_end
-          )
-
+          total_duration = float(previous_end)
 
           if total_duration <= 0:
-
               fail(
                   "Total timeline duration is zero"
               )
 
-
-          # ============================================================
-          # MODULE 17 REAL NARRATION
-          # ============================================================
-
-          if (
-              not audio.is_file()
-              or audio.stat().st_size == 0
-          ):
-
+          if not audio.is_file() or audio.stat().st_size == 0:
               fail(
-                  "Module 17 narration.mp3 is "
-                  "missing or empty"
+                  "narration.mp3 is missing or empty"
               )
 
+          audio_duration = probe_duration(audio)
 
-          audio_duration = probe_duration(
-              audio
-          )
-
-
-          if abs(
-              audio_duration -
-              total_duration
-          ) > 0.25:
-
+          if abs(audio_duration - total_duration) > 0.25:
               fail(
                   "Narration/timeline mismatch: " +
                   f"audio={audio_duration:.3f}s " +
                   f"timeline={total_duration:.3f}s"
               )
 
-
           print("")
           print("======================================")
           print("AICAP INPUT VALIDATION : PASSED")
           print("======================================")
-          print(
-              f"Scenes           : {len(normalized)}"
-          )
-          print(
-              f"Resolution       : {width}x{height}"
-          )
-          print(
-              f"FPS              : {fps}"
-          )
-          print(
-              f"Timeline         : {total_duration:.3f}s"
-          )
-          print(
-              f"Narration        : {audio_duration:.3f}s"
-          )
+          print(f"Scenes           : {len(normalized)}")
+          print(f"Resolution       : {width}x{height}")
+          print(f"FPS              : {fps}")
+          print(f"Timeline         : {total_duration:.3f}s")
+          print(f"Narration        : {audio_duration:.3f}s")
           print(
               "Audio difference : " +
               f"{abs(audio_duration-total_duration):.3f}s"
           )
-          print(
-              "JSON parser      : Python json.load()"
-          )
+          print("JSON parser      : Python json.load()")
           print("======================================")
 
-
-          # ============================================================
-          # 3. BUILD GLOBAL ASS SUBTITLES
-          # ============================================================
-
+          # --------------------------------------------------------
+          # 3. BUILD ONE GLOBAL ASS SUBTITLE FILE
+          # --------------------------------------------------------
           def ass_time(seconds):
-
-              seconds = max(
-                  0.0,
-                  float(seconds)
-              )
+              seconds = max(0.0, float(seconds))
 
               total_cs = int(
                   round(seconds * 100)
               )
 
-              hours = (
-                  total_cs //
-                  360000
-              )
-
+              hours = total_cs // 360000
               minutes = (
-                  total_cs %
-                  360000
+                  total_cs % 360000
               ) // 6000
-
               seconds_part = (
-                  total_cs %
-                  6000
+                  total_cs % 6000
               ) // 100
-
               centiseconds = (
-                  total_cs %
-                  100
+                  total_cs % 100
               )
 
               return (
@@ -568,15 +397,11 @@ jobs:
                   f"{centiseconds:02d}"
               )
 
-
           def ass_text(value):
-
               text = (
-                  ""
-                  if value is None
+                  "" if value is None
                   else str(value)
               )
-
 
               text = (
                   text
@@ -585,166 +410,128 @@ jobs:
                   .replace("\x00", "")
               )
 
-
-              # Prevent arbitrary ASS override tags.
+              # Prevent user text from becoming ASS override tags.
               text = (
                   text
                   .replace("{", "(")
                   .replace("}", ")")
               )
 
-
-              # Escape ASS backslash.
               text = text.replace(
                   "\\",
                   r"\\"
               )
 
-
-              # ASS line breaks.
               text = text.replace(
                   "\n",
                   r"\N"
               )
 
-
               return text.strip()
-
 
           def wrap_caption(
               value,
               width_chars=32,
-              max_lines=3
+              max_lines=4
           ):
-
-              text = (
-                  ""
-                  if value is None
+              raw = (
+                  "" if value is None
                   else str(value)
-              ).strip()
+              )
 
+              raw = (
+                  raw
+                  .replace("\r\n", "\n")
+                  .replace("\r", "\n")
+              )
 
-              if not text:
-                  return ""
-
-
-              words = text.split()
+              paragraphs = [
+                  p.strip()
+                  for p in raw.split("\n")
+                  if p.strip()
+              ]
 
               lines = []
-              current = ""
 
+              for paragraph in paragraphs:
 
-              for word in words:
+                  words = paragraph.split()
+                  line = ""
 
-                  candidate = (
-                      word
-                      if not current
-                      else current +
-                      " " +
-                      word
-                  )
+                  for word in words:
 
+                      if not line:
+                          line = word
 
-                  if len(candidate) <= width_chars:
+                      elif (
+                          len(line) +
+                          1 +
+                          len(word)
+                      ) <= width_chars:
+                          line += " " + word
 
-                      current = candidate
+                      else:
+                          lines.append(line)
+                          line = word
 
-                  else:
-
-                      if current:
-                          lines.append(
-                              current
-                          )
-
-                      current = word
-
-
-              if current:
-                  lines.append(
-                      current
-                  )
-
+                  if line:
+                      lines.append(line)
 
               if len(lines) > max_lines:
 
-                  lines = lines[
-                      :max_lines
-                  ]
+                  lines = lines[:max_lines]
 
                   lines[-1] = (
                       lines[-1]
-                      .rstrip(
-                          ".,;:!?"
-                      ) +
+                      .rstrip(".,;:!?") +
                       "…"
                   )
 
-
               return "\n".join(lines)
-
 
           ass_path = (
               WORK /
               "aicap_subtitles.ass"
           )
 
-
           subtitle_size = 80
           subtitle_outline = 5
           subtitle_shadow = 3
           subtitle_margin = 90
 
-
           ass_lines = [
-
               "[Script Info]",
-
               "ScriptType: v4.00+",
-
               "PlayResX: 1080",
-
               "PlayResY: 1920",
-
               "ScaledBorderAndShadow: yes",
-
               "",
-
               "[V4+ Styles]",
-
               (
                   "Format: Name, Fontname, Fontsize, "
                   "PrimaryColour, SecondaryColour, "
-                  "OutlineColour, BackColour, Bold, "
-                  "Italic, Underline, StrikeOut, "
-                  "ScaleX, ScaleY, Spacing, Angle, "
-                  "BorderStyle, Outline, Shadow, "
-                  "Alignment, MarginL, MarginR, "
+                  "OutlineColour, BackColour, Bold, Italic, "
+                  "Underline, StrikeOut, ScaleX, ScaleY, "
+                  "Spacing, Angle, BorderStyle, Outline, "
+                  "Shadow, Alignment, MarginL, MarginR, "
                   "MarginV, Encoding"
               ),
-
               (
-                  "Style: AICAP,"
-                  "Liberation Sans,"
-                  f"{subtitle_size},"
-                  "&H00FFFFFF,"
-                  "&H00FFFFFF,"
-                  "&H80000000,"
-                  "&H80000000,"
-                  "-1,0,0,0,"
-                  "100,100,0,0,1,"
-                  f"{subtitle_outline},"
-                  f"{subtitle_shadow},"
-                  "2,"
-                  f"{subtitle_margin},"
-                  f"{subtitle_margin},"
-                  f"{subtitle_margin},"
-                  "1"
+                  "Style: AICAP,DejaVu Sans," +
+                  str(subtitle_size) +
+                  ",&H00FFFFFF,&H00FFFFFF," +
+                  "&H80000000,&H80000000,-1,0,0,0," +
+                  "100,100,0,0,1," +
+                  str(subtitle_outline) + "," +
+                  str(subtitle_shadow) +
+                  ",2," +
+                  str(subtitle_margin) + "," +
+                  str(subtitle_margin) + "," +
+                  str(subtitle_margin) +
+                  ",1"
               ),
-
               "",
-
               "[Events]",
-
               (
                   "Format: Layer, Start, End, Style, "
                   "Name, MarginL, MarginR, MarginV, "
@@ -752,9 +539,7 @@ jobs:
               )
           ]
 
-
           subtitle_count = 0
-
 
           for scene in normalized:
 
@@ -765,55 +550,36 @@ jobs:
                   True
               )
 
-
               if not enabled:
                   continue
-
 
               text = subtitle.get(
                   "text",
                   ""
               )
 
-
-              text = wrap_caption(
-                  text
-              )
-
+              text = wrap_caption(text)
 
               if not text:
                   continue
 
-
               ass_lines.append(
                   "Dialogue: 0," +
-                  ass_time(
-                      scene["start"]
-                  ) +
+                  ass_time(scene["start"]) +
                   "," +
-                  ass_time(
-                      scene["end"]
-                  ) +
+                  ass_time(scene["end"]) +
                   ",AICAP,,0,0," +
-                  str(
-                      subtitle_margin
-                  ) +
+                  str(subtitle_margin) +
                   ",," +
                   ass_text(text)
               )
 
-
               subtitle_count += 1
 
-
           ass_path.write_text(
-              "\n".join(
-                  ass_lines
-              ) +
-              "\n",
+              "\n".join(ass_lines) + "\n",
               encoding="utf-8"
           )
-
 
           print("")
           print("======================================")
@@ -836,19 +602,15 @@ jobs:
           )
           print("======================================")
 
-
           if subtitle_count == 0:
-
               fail(
-                  "No enabled subtitle events "
-                  "were found in scene_config.json"
+                  "No enabled subtitle events were found "
+                  "in scene_config.json"
               )
 
-
-          # ============================================================
-          # 4. RENDER EACH SCENE INDEPENDENTLY
-          # ============================================================
-
+          # --------------------------------------------------------
+          # 4. RENDER EACH SCENE AS AN INDEPENDENT CLIP
+          # --------------------------------------------------------
           allowed_motions = {
               "zoom_in",
               "zoom_out",
@@ -856,231 +618,170 @@ jobs:
               "pan_right"
           }
 
-
           clip_paths = []
-
 
           for scene in normalized:
 
               i = scene["index"]
-
               dur = scene["duration"]
-
               image = scene["image"]
 
               motion = scene["motion"]
 
-
               if motion not in allowed_motions:
-
                   motion = (
                       "zoom_in",
                       "zoom_out",
                       "pan_left",
                       "pan_right"
-                  )[
-                      (i - 1) % 4
-                  ]
-
-
-              frames = max(
-                  1,
-                  int(
-                      round(
-                          dur * fps
-                      )
-                  )
-              )
-
-
-              zoom_amount = 1.08
-
+                  )[(i - 1) % 4]
 
               if motion == "zoom_in":
 
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={width * 2}:{height * 2}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
-                      f"zoompan="
-                      f"z='min(zoom+0.0008,{zoom_amount})':"
-                      f"x='iw/2-(iw/zoom/2)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:"
+                      f"crop={width * 2}:{height * 2},"
+                      "zoompan="
+                      "z='min(zoom+0.0007,1.12)':"
+                      "x='iw/2-(iw/zoom/2)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      "d=1:"
                       f"s={width}x{height}:"
                       f"fps={fps}"
                   )
-
 
               elif motion == "zoom_out":
 
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={width * 2}:{height * 2}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
-                      f"zoompan="
-                      f"z='max(1.0,{zoom_amount}-"
-                      f"on*0.0008)':"
-                      f"x='iw/2-(iw/zoom/2)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:"
+                      f"crop={width * 2}:{height * 2},"
+                      "zoompan="
+                      "z='if(lte(on,1),1.12,"
+                      "max(1.0,zoom-0.0007))':"
+                      "x='iw/2-(iw/zoom/2)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      "d=1:"
                       f"s={width}x{height}:"
                       f"fps={fps}"
                   )
-
 
               elif motion == "pan_left":
 
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={width * 2}:{height * 2}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
-                      f"zoompan="
-                      f"z='1.05':"
-                      f"x='(iw-iw/zoom)*"
-                      f"(1-min(on/"
-                      f"max(1,{frames-1}),1))':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:"
+                      f"crop={width * 2}:{height * 2},"
+                      "zoompan="
+                      "z='1.08':"
+                      "x='(iw-iw/zoom)*"
+                      "min(on/"
+                      f"max(1,{dur * fps:.6f}),1)':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      "d=1:"
                       f"s={width}x{height}:"
                       f"fps={fps}"
                   )
-
 
               else:
-
+                  # pan_right
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={width * 2}:{height * 2}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
-                      f"zoompan="
-                      f"z='1.05':"
-                      f"x='(iw-iw/zoom)*"
-                      f"min(on/"
-                      f"max(1,{frames-1}),1)':"
-                      f"y='ih/2-(ih/zoom/2)':"
-                      f"d={frames}:"
+                      f"crop={width * 2}:{height * 2},"
+                      "zoompan="
+                      "z='1.08':"
+                      "x='(iw-iw/zoom)*"
+                      "(1-min(on/"
+                      f"max(1,{dur * fps:.6f}),1))':"
+                      "y='ih/2-(ih/zoom/2)':"
+                      "d=1:"
                       f"s={width}x{height}:"
                       f"fps={fps}"
                   )
-
 
               fade = min(
                   0.5,
-                  max(
-                      0.05,
-                      dur / 4.0
-                  )
+                  max(0.05, dur / 4.0)
               )
-
 
               fade_out_start = max(
                   0.0,
                   dur - fade
               )
 
-
               visual += (
-                  f",fade=t=in:"
-                  f"st=0:"
-                  f"d={fade:.6f}"
+                  f",fade=t=in:st=0:d={fade:.6f}"
                   f",fade=t=out:"
                   f"st={fade_out_start:.6f}:"
                   f"d={fade:.6f}"
                   ",format=yuv420p"
               )
 
-
               clip = (
                   WORK /
                   f"scene_{i:02d}.mp4"
               )
-
 
               run(
                   [
                       "ffmpeg",
                       "-y",
                       "-hide_banner",
-                      "-loglevel",
-                      "error",
-                      "-loop",
-                      "1",
-                      "-framerate",
-                      str(fps),
-                      "-i",
-                      str(image),
-                      "-t",
-                      f"{dur:.6f}",
-                      "-vf",
-                      visual,
+                      "-loglevel", "error",
+                      "-loop", "1",
+                      "-framerate", str(fps),
+                      "-i", str(image),
+                      "-t", f"{dur:.6f}",
+                      "-vf", visual,
                       "-an",
-                      "-c:v",
-                      "libx264",
-                      "-preset",
-                      "veryfast",
-                      "-crf",
-                      "20",
-                      "-pix_fmt",
-                      "yuv420p",
-                      "-r",
-                      str(fps),
-                      "-movflags",
-                      "+faststart",
+                      "-c:v", "libx264",
+                      "-preset", "veryfast",
+                      "-crf", "20",
+                      "-pix_fmt", "yuv420p",
+                      "-r", str(fps),
+                      "-movflags", "+faststart",
                       str(clip)
                   ],
                   (
                       f"RENDER SCENE {i}/"
-                      f"{len(normalized)} "
-                      f"[{motion}]"
+                      f"{len(normalized)} [{motion}]"
                   )
               )
 
-
               if (
-                  not clip.is_file()
-                  or clip.stat().st_size == 0
+                  not clip.is_file() or
+                  clip.stat().st_size == 0
               ):
-
                   fail(
                       f"Scene {i} produced no output"
                   )
-
 
               clip_duration = probe_duration(
                   clip
               )
 
-
               if abs(
-                  clip_duration -
-                  dur
+                  clip_duration - dur
               ) > 0.15:
-
                   fail(
-                      f"Scene {i} duration mismatch: "
-                      f"expected={dur:.3f}s "
+                      f"Scene {i} duration mismatch: " +
+                      f"expected={dur:.3f}s " +
                       f"actual={clip_duration:.3f}s"
                   )
 
+              clip_paths.append(clip)
 
-              clip_paths.append(
-                  clip
-              )
-
-
-          # ============================================================
+          # --------------------------------------------------------
           # 5. CONCATENATE SCENE CLIPS
-          # ============================================================
-
+          # --------------------------------------------------------
           concat_list = (
               WORK /
               "concat.txt"
           )
 
-
           concat_lines = []
-
 
           for clip in clip_paths:
 
@@ -1091,131 +792,80 @@ jobs:
                   "'\\''"
               )
 
-
               concat_lines.append(
                   "file '" +
                   path_text +
                   "'"
               )
 
-
           concat_list.write_text(
-              "\n".join(
-                  concat_lines
-              ) +
-              "\n",
+              "\n".join(concat_lines) + "\n",
               encoding="utf-8"
           )
-
 
           joined = (
               WORK /
               "aicap_joined.mp4"
           )
 
-
           run(
               [
                   "ffmpeg",
                   "-y",
                   "-hide_banner",
-                  "-loglevel",
-                  "error",
-                  "-f",
-                  "concat",
-                  "-safe",
-                  "0",
-                  "-i",
-                  str(concat_list),
-                  "-c",
-                  "copy",
-                  "-movflags",
-                  "+faststart",
+                  "-loglevel", "error",
+                  "-f", "concat",
+                  "-safe", "0",
+                  "-i", str(concat_list),
+                  "-c", "copy",
+                  "-movflags", "+faststart",
                   str(joined)
               ],
               "JOIN SCENES"
           )
 
-
           joined_duration = probe_duration(
               joined
           )
-
 
           if abs(
               joined_duration -
               total_duration
           ) > 0.20:
-
               fail(
-                  "Joined video duration mismatch: "
-                  f"expected={total_duration:.3f}s "
+                  "Joined video duration mismatch: " +
+                  f"expected={total_duration:.3f}s " +
                   f"actual={joined_duration:.3f}s"
               )
 
-
-          # ============================================================
+          # --------------------------------------------------------
           # 6. FINAL PASS
           #
-          # Burn global ASS subtitles.
-          # Add the REAL Module 17 narration.
-          # ============================================================
-
+          # Burn global ASS subtitles and add the real narration.
+          # --------------------------------------------------------
           font_file_result = subprocess.run(
               [
                   "fc-match",
                   "-f",
                   "%{file}\n",
-                  "Liberation Sans:style=Bold"
+                  "DejaVu Sans:style=Bold"
               ],
               stdout=subprocess.PIPE,
               stderr=subprocess.STDOUT,
               text=True
           )
 
-
-          if (
-              font_file_result.returncode != 0
-          ):
-
+          if font_file_result.returncode != 0:
               fail(
-                  "fontconfig could not resolve "
-                  "Liberation Sans Bold\n" +
+                  "fontconfig could not resolve DejaVu Sans Bold\n" +
                   font_file_result.stdout
               )
 
+          font_file = font_file_result.stdout.strip().splitlines()[0]
+          font_dir = str(Path(font_file).parent)
 
-          font_lines = (
-              font_file_result.stdout
-              .strip()
-              .splitlines()
-          )
-
-
-          if not font_lines:
-
-              fail(
-                  "Could not determine subtitle font"
-              )
-
-
-          font_file = font_lines[0].strip()
-
-          font_dir = str(
-              Path(font_file).parent
-          )
-
-
-          if not Path(
-              font_file
-          ).is_file():
-
-              fail(
-                  "Resolved subtitle font does "
-                  "not exist: " +
-                  font_file
-              )
-
+          if not Path(font_file).is_file():
+              fail("Resolved subtitle font does not exist: " + font_file)
 
           subtitle_filter = (
               "subtitles=" +
@@ -1224,76 +874,53 @@ jobs:
               font_dir
           )
 
-
           run(
               [
                   "ffmpeg",
                   "-y",
                   "-hide_banner",
-                  "-loglevel",
-                  "error",
-                  "-i",
-                  str(joined),
-                  "-i",
-                  str(audio),
-                  "-vf",
-                  subtitle_filter,
-                  "-map",
-                  "0:v:0",
-                  "-map",
-                  "1:a:0",
-                  "-c:v",
-                  "libx264",
-                  "-preset",
-                  "medium",
-                  "-crf",
-                  "20",
-                  "-pix_fmt",
-                  "yuv420p",
-                  "-r",
-                  str(fps),
-                  "-c:a",
-                  "aac",
-                  "-b:a",
-                  "192k",
-                  "-af",
-                  "aresample=async=1:first_pts=0",
-                  "-t",
-                  f"{total_duration:.6f}",
-                  "-movflags",
-                  "+faststart",
+                  "-loglevel", "error",
+                  "-i", str(joined),
+                  "-i", str(audio),
+                  "-vf", subtitle_filter,
+                  "-map", "0:v:0",
+                  "-map", "1:a:0",
+                  "-c:v", "libx264",
+                  "-preset", "medium",
+                  "-crf", "20",
+                  "-pix_fmt", "yuv420p",
+                  "-r", str(fps),
+                  "-c:a", "aac",
+                  "-b:a", "192k",
+                  "-af", "aresample=async=1:first_pts=0",
+                  "-t", f"{total_duration:.6f}",
+                  "-movflags", "+faststart",
                   str(output)
               ],
               "FINALIZE VIDEO + SUBTITLES + NARRATION"
           )
 
-
           if (
-              not output.is_file()
-              or output.stat().st_size == 0
+              not output.is_file() or
+              output.stat().st_size == 0
           ):
-
               fail(
                   "Final MP4 was not created"
               )
-
 
           final_duration = probe_duration(
               output
           )
 
-
           if abs(
               final_duration -
               total_duration
           ) > 0.25:
-
               fail(
-                  "Final video duration mismatch: "
-                  f"expected={total_duration:.3f}s "
+                  "Final video duration mismatch: " +
+                  f"expected={total_duration:.3f}s " +
                   f"actual={final_duration:.3f}s"
               )
-
 
           print("")
           print("======================================")
@@ -1318,7 +945,7 @@ jobs:
               "Subtitles burned : YES"
           )
           print(
-              "Narration        : MODULE 17 REAL"
+              "Narration        : YES"
           )
           print(
               "Motion           : YES"
@@ -1327,7 +954,6 @@ jobs:
               "Fade transitions : YES"
           )
           print("======================================")
-
           PY
 
 
@@ -1345,76 +971,61 @@ jobs:
 
           test -s "$OUT"
 
-
           WIDTH="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams v:0 \
               -show_entries stream=width \
               -of csv=p=0 \
               "$OUT"
           )"
 
-
           HEIGHT="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams v:0 \
               -show_entries stream=height \
               -of csv=p=0 \
               "$OUT"
           )"
 
-
           VCODEC="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams v:0 \
               -show_entries stream=codec_name \
               -of csv=p=0 \
               "$OUT"
           )"
-
 
           ACODEC="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams a:0 \
               -show_entries stream=codec_name \
               -of csv=p=0 \
               "$OUT"
           )"
 
-
           V_DURATION="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams v:0 \
               -show_entries stream=duration \
               -of csv=p=0 \
               "$OUT"
           )"
 
-
           A_DURATION="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams a:0 \
               -show_entries stream=duration \
               -of csv=p=0 \
               "$OUT"
           )"
 
-
           FPS="$(
-            ffprobe \
-              -v error \
+            ffprobe -v error \
               -select_streams v:0 \
               -show_entries stream=r_frame_rate \
               -of csv=p=0 \
               "$OUT"
           )"
-
 
           test "$WIDTH" = "1080"
           test "$HEIGHT" = "1920"
@@ -1422,7 +1033,6 @@ jobs:
           test "$ACODEC" = "aac"
           test -n "$V_DURATION"
           test -n "$A_DURATION"
-
 
           echo ""
           echo "======================================"
@@ -1436,7 +1046,6 @@ jobs:
           echo "Audio time : ${A_DURATION}s"
           echo "======================================"
 
-
           awk \
             -v v="$V_DURATION" \
             -v a="$A_DURATION" \
@@ -1449,8 +1058,6 @@ jobs:
               }
             }'
 
-
-          echo ""
           echo "FINAL VERIFICATION: SUCCESS"
 
 
@@ -1467,33 +1074,23 @@ jobs:
           rm -rf artifact
           mkdir -p artifact
 
-
           cp \
             "$ROOT/aicap_final.mp4" \
             artifact/aicap_final.mp4
-
 
           cp \
             "$ROOT/scene_config.json" \
             artifact/scene_config.json
 
-
           cp \
             "$ROOT/narration.mp3" \
             artifact/narration.mp3
 
-
-          if [ \
-            -f \
-            "$ROOT/_aicap_work/aicap_subtitles.ass" \
-          ]; then
-
+          if [ -f "$ROOT/_aicap_work/aicap_subtitles.ass" ]; then
             cp \
               "$ROOT/_aicap_work/aicap_subtitles.ass" \
               artifact/aicap_subtitles.ass
-
           fi
-
 
           find "$ROOT" \
             -maxdepth 1 \
@@ -1505,13 +1102,10 @@ jobs:
             \) \
             -exec cp {} artifact/ \;
 
-
           echo "======================================"
           echo "ARTIFACT PACKAGE READY"
           echo "======================================"
-
           ls -lh artifact/
-
           echo "======================================"
 
 
