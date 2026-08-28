@@ -20,6 +20,7 @@ jobs:
       - name: Checkout renderer
         uses: actions/checkout@v4
 
+
       # ============================================================
       # 2. INSTALL FFMPEG + FONTS
       # ============================================================
@@ -29,6 +30,7 @@ jobs:
           set -euo pipefail
 
           sudo apt-get update
+
           sudo apt-get install -y \
             ffmpeg \
             fontconfig \
@@ -38,13 +40,7 @@ jobs:
           command -v ffprobe
           command -v fc-match
 
-          FONT_FILE="$(
-            fc-match \
-              -f '%{file}\n' \
-              'DejaVu Sans:style=Bold' \
-              | head -n 1
-          )"
-
+          FONT_FILE="$(fc-match -f '%{file}\n' 'DejaVu Sans:style=Bold' | head -n 1)"
           FONT_DIR="$(dirname "$FONT_FILE")"
 
           test -n "$FONT_FILE"
@@ -59,6 +55,7 @@ jobs:
           echo "Font     : $FONT_FILE"
           echo "Font dir : $FONT_DIR"
           echo "======================================"
+
 
       # ============================================================
       # 3. LOCATE RENDER JOB
@@ -86,16 +83,26 @@ jobs:
 
           echo "root=$ROOT" >> "$GITHUB_OUTPUT"
 
+
       # ============================================================
       # 4. RENDER VIDEO
       #
-      # JSON is always parsed with json.load().
+      # IMPORTANT:
+      # - scene_config.json is DATA and is parsed with json.load()
+      # - Module 17 narration remains the audio master
+      # - Each scene is rendered independently
+      # - Motion is deliberately stronger than the previous V4
+      # - Subtitles are generated globally and burned after concat
+      # - Exact scene durations are preserved
       #
-      # Subtitles are OPTIONAL at renderer level:
-      #   - subtitle events present -> ASS + burned subtitles
-      #   - subtitle events absent  -> render continues without them
+      # MOTION V4.1:
+      #   zoom_in  : 1.00 -> 1.18
+      #   zoom_out : 1.18 -> 1.00
+      #   pan_left : 1.12 zoom + full horizontal travel
+      #   pan_right: 1.12 zoom + full horizontal travel
       #
-      # Narration remains mandatory and audio-driven.
+      # This is intentionally visible to the viewer while remaining
+      # a controlled Ken-Burns-style movement.
       # ============================================================
       - name: Render video
         shell: bash
@@ -110,6 +117,8 @@ jobs:
 
           python3 - "$CFG" "$ROOT" "$AUDIO" "$OUT" <<'PY'
           import json
+          import math
+          import os
           import shlex
           import subprocess
           import sys
@@ -124,21 +133,14 @@ jobs:
           WORK.mkdir(parents=True, exist_ok=True)
 
           def fail(message):
-              raise SystemExit(
-                  "AICAP RENDER ERROR: " + str(message)
-              )
+              raise SystemExit("AICAP RENDER ERROR: " + str(message))
 
           def run(cmd, label):
               print("")
               print("======================================")
               print(label)
               print("======================================")
-              print(
-                  " ".join(
-                      shlex.quote(str(x))
-                      for x in cmd
-                  )
-              )
+              print(" ".join(shlex.quote(str(x)) for x in cmd))
 
               result = subprocess.run(
                   [str(x) for x in cmd],
@@ -162,12 +164,9 @@ jobs:
               result = subprocess.run(
                   [
                       "ffprobe",
-                      "-v",
-                      "error",
-                      "-show_entries",
-                      "format=duration",
-                      "-of",
-                      "default=noprint_wrappers=1:nokey=1",
+                      "-v", "error",
+                      "-show_entries", "format=duration",
+                      "-of", "default=noprint_wrappers=1:nokey=1",
                       str(path)
                   ],
                   stdout=subprocess.PIPE,
@@ -185,22 +184,17 @@ jobs:
 
               try:
                   return float(result.stdout.strip())
-              except Exception:
+              except ValueError:
                   fail(
-                      "Could not read duration from " +
-                      str(path) +
-                      "\n" +
-                      result.stdout
+                      "Invalid duration returned by ffprobe for " +
+                      str(path)
                   )
 
-          # ========================================================
+          # --------------------------------------------------------
           # 1. READ JSON AS JSON DATA
-          # ========================================================
+          # --------------------------------------------------------
           try:
-              with cfg_path.open(
-                  "r",
-                  encoding="utf-8"
-              ) as f:
+              with cfg_path.open("r", encoding="utf-8") as f:
                   cfg = json.load(f)
           except Exception as exc:
               fail(
@@ -209,9 +203,7 @@ jobs:
               )
 
           if not isinstance(cfg, dict):
-              fail(
-                  "scene_config.json root must be an object"
-              )
+              fail("scene_config.json root must be an object")
 
           project = cfg.get("project") or {}
           resolution = project.get("resolution") or {}
@@ -251,24 +243,18 @@ jobs:
 
           scenes = cfg.get("scenes")
 
-          if (
-              not isinstance(scenes, list)
-              or not scenes
-          ):
+          if not isinstance(scenes, list) or not scenes:
               fail(
                   "scene_config.json contains no scenes"
               )
 
-          # ========================================================
+          # --------------------------------------------------------
           # 2. AUTHORITATIVE AUDIO-DRIVEN TIMELINE
-          # ========================================================
+          # --------------------------------------------------------
           normalized = []
           previous_end = 0.0
 
-          for index, scene in enumerate(
-              scenes,
-              1
-          ):
+          for index, scene in enumerate(scenes, 1):
 
               if not isinstance(scene, dict):
                   fail(
@@ -280,8 +266,7 @@ jobs:
                   end = float(scene["end"])
               except Exception as exc:
                   fail(
-                      f"Scene {index} has invalid start/end: " +
-                      str(exc)
+                      f"Scene {index} has invalid start/end: {exc}"
                   )
 
               if start < -0.001:
@@ -294,9 +279,7 @@ jobs:
                       f"Scene {index} has end <= start"
                   )
 
-              if abs(
-                  start - previous_end
-              ) > 0.01:
+              if abs(start - previous_end) > 0.01:
                   fail(
                       f"Timeline gap/overlap before scene {index}: " +
                       f"{start:.3f} != {previous_end:.3f}"
@@ -307,41 +290,32 @@ jobs:
                   f"scene_{index:02d}.jpg"
               ).strip()
 
-              image = (
-                  root / filename
-              ).resolve()
+              image = (root / filename).resolve()
 
               if (
-                  not image.is_file()
-                  or image.stat().st_size == 0
+                  not image.is_file() or
+                  image.stat().st_size == 0
               ):
                   fail(
-                      "Missing/empty scene image: " +
-                      str(image)
+                      f"Missing/empty scene image: {image}"
                   )
 
-              subtitle_value = (
-                  scene.get("subtitle") or {}
-              )
-
-              if not isinstance(
-                  subtitle_value,
-                  dict
-              ):
-                  subtitle_value = {}
+              duration = end - start
 
               normalized.append(
                   {
                       "index": index,
                       "start": start,
                       "end": end,
-                      "duration": end - start,
+                      "duration": duration,
                       "filename": filename,
                       "image": image,
                       "motion": str(
                           scene.get("motion") or ""
                       ).strip(),
-                      "subtitle": subtitle_value
+                      "subtitle": (
+                          scene.get("subtitle") or {}
+                      )
                   }
               )
 
@@ -355,18 +329,17 @@ jobs:
               )
 
           if (
-              not audio.is_file()
-              or audio.stat().st_size == 0
+              not audio.is_file() or
+              audio.stat().st_size == 0
           ):
               fail(
-                  "Module 17 narration.mp3 is missing or empty"
+                  "narration.mp3 is missing or empty"
               )
 
           audio_duration = probe_duration(audio)
 
           if abs(
-              audio_duration -
-              total_duration
+              audio_duration - total_duration
           ) > 0.25:
               fail(
                   "Narration/timeline mismatch: " +
@@ -400,14 +373,20 @@ jobs:
           print(
               "JSON parser      : Python json.load()"
           )
+          print(
+              "Motion profile   : V4.1 VISIBLE KEN-BURNS"
+          )
+          print(
+              "Zoom range       : 1.00 -> 1.18"
+          )
+          print(
+              "Pan zoom         : 1.12"
+          )
           print("======================================")
 
-          # ========================================================
-          # 3. BUILD GLOBAL ASS SUBTITLES
-          #
-          # IMPORTANT:
-          # subtitle_count == 0 is NOT a render failure.
-          # ========================================================
+          # --------------------------------------------------------
+          # 3. BUILD ONE GLOBAL ASS SUBTITLE FILE
+          # --------------------------------------------------------
           def ass_time(seconds):
               seconds = max(
                   0.0,
@@ -418,24 +397,15 @@ jobs:
                   round(seconds * 100)
               )
 
-              hours = (
-                  total_cs //
-                  360000
-              )
-
+              hours = total_cs // 360000
               minutes = (
-                  total_cs %
-                  360000
+                  total_cs % 360000
               ) // 6000
-
               seconds_part = (
-                  total_cs %
-                  6000
+                  total_cs % 6000
               ) // 100
-
               centiseconds = (
-                  total_cs %
-                  100
+                  total_cs % 100
               )
 
               return (
@@ -447,8 +417,7 @@ jobs:
 
           def ass_text(value):
               text = (
-                  ""
-                  if value is None
+                  "" if value is None
                   else str(value)
               )
 
@@ -482,57 +451,36 @@ jobs:
               width_chars=32,
               max_lines=4
           ):
-              raw = (
-                  ""
-                  if value is None
-                  else str(value)
-              )
+              words = str(value).split()
 
-              raw = (
-                  raw
-                  .replace("\r\n", "\n")
-                  .replace("\r", "\n")
-              )
-
-              paragraphs = [
-                  p.strip()
-                  for p in raw.split("\n")
-                  if p.strip()
-              ]
+              if not words:
+                  return ""
 
               lines = []
+              current = ""
 
-              for paragraph in paragraphs:
+              for word in words:
+                  candidate = (
+                      word if not current
+                      else current + " " + word
+                  )
 
-                  words = paragraph.split()
-                  line = ""
+                  if len(candidate) <= width_chars:
+                      current = candidate
+                  else:
+                      if current:
+                          lines.append(current)
+                      current = word
 
-                  for word in words:
-
-                      if not line:
-                          line = word
-
-                      elif (
-                          len(line) +
-                          1 +
-                          len(word)
-                      ) <= width_chars:
-                          line += " " + word
-
-                      else:
-                          lines.append(line)
-                          line = word
-
-                  if line:
-                      lines.append(line)
+              if current:
+                  lines.append(current)
 
               if len(lines) > max_lines:
-
                   lines = lines[:max_lines]
-
                   lines[-1] = (
-                      lines[-1]
-                      .rstrip(".,;:!?") +
+                      lines[-1].rstrip(
+                          ".,;:!?"
+                      ) +
                       "…"
                   )
 
@@ -651,21 +599,32 @@ jobs:
           )
           print("======================================")
 
-          if subtitle_count > 0:
-              print(
-                  "Subtitles       : ENABLED"
-              )
-          else:
-              print(
-                  "Subtitles       : NONE PROVIDED"
-              )
-              print(
-                  "Render policy   : CONTINUE WITHOUT SUBTITLES"
+          if subtitle_count == 0:
+              fail(
+                  "No enabled subtitle events were found " +
+                  "in scene_config.json"
               )
 
-          # ========================================================
-          # 4. RENDER EACH SCENE INDEPENDENTLY
-          # ========================================================
+          # --------------------------------------------------------
+          # 4. RENDER EACH SCENE AS AN INDEPENDENT CLIP
+          #
+          # Stronger V4.1 motion:
+          #
+          # zoom_in:
+          #   smooth 1.00 -> 1.18
+          #
+          # zoom_out:
+          #   smooth 1.18 -> 1.00
+          #
+          # pan_left:
+          #   1.12 zoom + full horizontal travel
+          #
+          # pan_right:
+          #   1.12 zoom + full horizontal travel
+          #
+          # The movement is deliberately large enough to be
+          # observable on a phone screen.
+          # --------------------------------------------------------
           allowed_motions = {
               "zoom_in",
               "zoom_out",
@@ -691,61 +650,93 @@ jobs:
                       "pan_right"
                   )[(i - 1) % 4]
 
+              frames = max(
+                  2,
+                  int(
+                      round(
+                          dur * fps
+                      )
+                  )
+              )
+
+              # Use a large working canvas so the camera can move
+              # without exposing the image edges.
+              working_w = width * 2
+              working_h = height * 2
+
               if motion == "zoom_in":
+
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={working_w}:{working_h}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
+                      f"crop={working_w}:{working_h},"
                       "zoompan="
-                      "z='min(zoom+0.0007,1.12)':"
+                      f"z='1+0.18*"
+                      f"min(on/max(1,{frames - 1}),1)':"
                       "x='iw/2-(iw/zoom/2)':"
                       "y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      "d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
 
               elif motion == "zoom_out":
+
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={working_w}:{working_h}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
+                      f"crop={working_w}:{working_h},"
                       "zoompan="
-                      "z='if(lte(on,1),1.12,"
-                      "max(1.0,zoom-0.0007))':"
+                      f"z='1.18-0.18*"
+                      f"min(on/max(1,{frames - 1}),1)':"
                       "x='iw/2-(iw/zoom/2)':"
                       "y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      "d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
 
               elif motion == "pan_left":
+
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={working_w}:{working_h}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
+                      f"crop={working_w}:{working_h},"
                       "zoompan="
-                      "z='1.08':"
+                      "z='1.12':"
                       "x='(iw-iw/zoom)*"
-                      "(1-min(on/"
-                      f"(max(1,{dur*fps:.6f})),1))':"
+                      f"(1-min(on/max(1,{frames - 1}),1))':"
                       "y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      "d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
 
               else:
+
                   visual = (
-                      f"scale={width*2}:{height*2}:"
+                      f"scale={working_w}:{working_h}:"
                       "force_original_aspect_ratio=increase,"
-                      f"crop={width*2}:{height*2},"
+                      f"crop={working_w}:{working_h},"
                       "zoompan="
-                      "z='1.08':"
+                      "z='1.12':"
                       "x='(iw-iw/zoom)*"
-                      f"min(on/(max(1,{dur*fps:.6f})),1)':"
+                      f"min(on/max(1,{frames - 1}),1)':"
                       "y='ih/2-(ih/zoom/2)':"
-                      f"d=1:s={width}x{height}:fps={fps}"
+                      "d=1:"
+                      f"s={width}x{height}:"
+                      f"fps={fps}"
                   )
 
+              # Short fades are kept at scene boundaries. They do not
+              # replace the camera motion and do not alter the master
+              # audio-driven timeline.
               fade = min(
-                  0.5,
-                  max(0.05, dur / 4.0)
+                  0.35,
+                  max(
+                      0.10,
+                      dur / 8.0
+                  )
               )
 
               fade_out_start = max(
@@ -754,8 +745,10 @@ jobs:
               )
 
               visual += (
-                  f",fade=t=in:st=0:d={fade:.6f}"
-                  f",fade=t=out:st={fade_out_start:.6f}:"
+                  f",fade=t=in:st=0:"
+                  f"d={fade:.6f}"
+                  f",fade=t=out:"
+                  f"st={fade_out_start:.6f}:"
                   f"d={fade:.6f}"
                   ",format=yuv420p"
               )
@@ -785,12 +778,15 @@ jobs:
                       "-movflags", "+faststart",
                       str(clip)
                   ],
-                  f"RENDER SCENE {i}/{len(normalized)} [{motion}]"
+                  (
+                      f"RENDER SCENE {i}/"
+                      f"{len(normalized)} [{motion}]"
+                  )
               )
 
               if (
-                  not clip.is_file()
-                  or clip.stat().st_size == 0
+                  not clip.is_file() or
+                  clip.stat().st_size == 0
               ):
                   fail(
                       f"Scene {i} produced no output"
@@ -809,12 +805,23 @@ jobs:
                       f"actual={clip_duration:.3f}s"
                   )
 
+              print(
+                  f"Scene {i} motion : {motion}"
+              )
+              print(
+                  f"Scene {i} duration : " +
+                  f"{clip_duration:.3f}s"
+              )
+
               clip_paths.append(clip)
 
-          # ========================================================
+          # --------------------------------------------------------
           # 5. CONCATENATE SCENE CLIPS
-          # ========================================================
-          concat_list = WORK / "concat.txt"
+          # --------------------------------------------------------
+          concat_list = (
+              WORK /
+              "concat.txt"
+          )
 
           concat_lines = []
 
@@ -864,8 +871,7 @@ jobs:
           )
 
           if abs(
-              joined_duration -
-              total_duration
+              joined_duration - total_duration
           ) > 0.20:
               fail(
                   "Joined video duration mismatch: " +
@@ -873,69 +879,48 @@ jobs:
                   f"actual={joined_duration:.3f}s"
               )
 
-          # ========================================================
+          # --------------------------------------------------------
           # 6. FINAL PASS
           #
-          # Subtitles are conditionally burned.
-          # Narration is always added.
-          # ========================================================
-          final_cmd = [
-              "ffmpeg",
-              "-y",
-              "-hide_banner",
-              "-loglevel", "error",
-              "-i", str(joined),
-              "-i", str(audio)
-          ]
-
-          if subtitle_count > 0:
-
-              subtitle_filter = (
-                  "subtitles=" +
-                  str(ass_path) +
-                  ":fontsdir="
-                  "/usr/share/fonts/truetype/dejavu"
-              )
-
-              final_cmd += [
-                  "-vf",
-                  subtitle_filter
-              ]
-
-              final_label = (
-                  "FINALIZE VIDEO + SUBTITLES + NARRATION"
-              )
-
-          else:
-
-              final_label = (
-                  "FINALIZE VIDEO + NARRATION"
-              )
-
-          final_cmd += [
-              "-map", "0:v:0",
-              "-map", "1:a:0",
-              "-c:v", "libx264",
-              "-preset", "medium",
-              "-crf", "20",
-              "-pix_fmt", "yuv420p",
-              "-r", str(fps),
-              "-c:a", "aac",
-              "-b:a", "192k",
-              "-af", "aresample=async=1:first_pts=0",
-              "-t", f"{total_duration:.6f}",
-              "-movflags", "+faststart",
-              str(output)
-          ]
+          # Burn global ASS subtitles and add the real Module 17
+          # narration. The joined visual timeline remains authoritative.
+          # --------------------------------------------------------
+          subtitle_filter = (
+              "subtitles=" +
+              str(ass_path) +
+              ":fontsdir="
+              "/usr/share/fonts/truetype/dejavu"
+          )
 
           run(
-              final_cmd,
-              final_label
+              [
+                  "ffmpeg",
+                  "-y",
+                  "-hide_banner",
+                  "-loglevel", "error",
+                  "-i", str(joined),
+                  "-i", str(audio),
+                  "-vf", subtitle_filter,
+                  "-map", "0:v:0",
+                  "-map", "1:a:0",
+                  "-c:v", "libx264",
+                  "-preset", "medium",
+                  "-crf", "20",
+                  "-pix_fmt", "yuv420p",
+                  "-r", str(fps),
+                  "-c:a", "aac",
+                  "-b:a", "192k",
+                  "-af", "aresample=async=1:first_pts=0",
+                  "-t", f"{total_duration:.6f}",
+                  "-movflags", "+faststart",
+                  str(output)
+              ],
+              "FINALIZE VIDEO + SUBTITLES + NARRATION"
           )
 
           if (
-              not output.is_file()
-              or output.stat().st_size == 0
+              not output.is_file() or
+              output.stat().st_size == 0
           ):
               fail(
                   "Final MP4 was not created"
@@ -946,8 +931,7 @@ jobs:
           )
 
           if abs(
-              final_duration -
-              total_duration
+              final_duration - total_duration
           ) > 0.25:
               fail(
                   "Final video duration mismatch: " +
@@ -974,27 +958,27 @@ jobs:
           print(
               f"Subtitle events  : {subtitle_count}"
           )
-
-          if subtitle_count > 0:
-              print(
-                  "Subtitles burned : YES"
-              )
-          else:
-              print(
-                  "Subtitles burned : NO"
-              )
-
+          print(
+              "Subtitles burned : YES"
+          )
           print(
               "Narration        : YES"
           )
           print(
-              "Motion           : YES"
+              "Motion            : VISIBLE V4.1"
           )
           print(
-              "Fade transitions : YES"
+              "Zoom              : 1.00 -> 1.18"
+          )
+          print(
+              "Pan zoom          : 1.12"
+          )
+          print(
+              "Fade transitions  : YES"
           )
           print("======================================")
           PY
+
 
       # ============================================================
       # 5. VERIFY FINAL MP4
@@ -1099,6 +1083,7 @@ jobs:
 
           echo "FINAL VERIFICATION: SUCCESS"
 
+
       # ============================================================
       # 6. PACKAGE RENDER ARTIFACT
       # ============================================================
@@ -1146,8 +1131,11 @@ jobs:
           echo "======================================"
           echo "ARTIFACT PACKAGE READY"
           echo "======================================"
+
           ls -lh artifact/
+
           echo "======================================"
+
 
       # ============================================================
       # 7. UPLOAD FINAL RENDER ARTIFACT
