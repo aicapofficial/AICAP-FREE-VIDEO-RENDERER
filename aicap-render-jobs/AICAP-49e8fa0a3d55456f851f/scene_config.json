@@ -1,0 +1,145 @@
+{
+  "project": {
+    "name": "AICAP-49e8fa0a3d55456f851f",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 34.824,
+    "format": "mp4"
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP-49e8fa0a3d55456f851f/narration.mp3",
+    "mode": "timeline_sync",
+    "suppliedBy": "MODULE_17",
+    "generatedByModule20": false
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP-49e8fa0a3d55456f851f/scene_01.jpg",
+      "start": 0,
+      "duration": 10.758,
+      "end": 10.758,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "In modern machine learning,\ntransformer architectures rely\non self-attention mechanisms to\nprocess sequential data in…",
+        "start": 0,
+        "end": 10.758,
+        "duration": 10.758,
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP-49e8fa0a3d55456f851f/scene_02.jpg",
+      "start": 10.758,
+      "duration": 11.119,
+      "end": 21.877,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "As parameter counts scale into\nthe hundreds of billions, model\noptimization techniques like\nquantization, low-rank…",
+        "start": 10.758,
+        "end": 21.877,
+        "duration": 11.119,
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP-49e8fa0a3d55456f851f/scene_03.jpg",
+      "start": 21.877,
+      "duration": 5.8,
+      "end": 27.677,
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "text": "These technical breakthroughs\nallow us to deploy\nhigh-throughput inference at the\nedge and in enterprise data…",
+        "start": 21.877,
+        "end": 27.677,
+        "duration": 5.8,
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 4,
+      "image": "aicap-render-jobs/AICAP-49e8fa0a3d55456f851f/scene_04.jpg",
+      "start": 27.677,
+      "duration": 7.147,
+      "end": 34.824,
+      "motion": "pan_right",
+      "subtitle": {
+        "enabled": true,
+        "text": "Understanding these core AI\nprimitives is no longer optional\nfor software engineers—it is the\nfoundation of modern system…",
+        "start": 27.677,
+        "end": 34.824,
+        "duration": 7.147,
+        "style": {
+          "font": "Arial",
+          "size": 80,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    }
+  ]
+}
