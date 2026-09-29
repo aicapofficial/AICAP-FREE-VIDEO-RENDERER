@@ -491,7 +491,7 @@ jobs:
               "aicap_subtitles.ass"
           )
 
-          subtitle_size = 80
+          subtitle_size = 56
           subtitle_outline = 5
           subtitle_shadow = 3
           subtitle_margin = 90
