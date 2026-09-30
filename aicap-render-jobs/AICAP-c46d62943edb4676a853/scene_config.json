@@ -1,0 +1,175 @@
+{
+  "project": {
+    "name": "AICAP-c46d62943edb4676a853",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    },
+    "fps": 30,
+    "total_duration": 39.768,
+    "format": "mp4"
+  },
+  "transition": {
+    "type": "fade",
+    "duration": 1
+  },
+  "narration": {
+    "enabled": true,
+    "source": "aicap-render-jobs/AICAP-c46d62943edb4676a853/narration.mp3",
+    "mode": "timeline_sync",
+    "suppliedBy": "MODULE_17",
+    "generatedByModule20": false
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "image": "aicap-render-jobs/AICAP-c46d62943edb4676a853/scene_01.jpg",
+      "start": 0,
+      "duration": 2.189,
+      "end": 2.189,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "Let's demystify Machine\nLearning.",
+        "start": 0,
+        "end": 2.189,
+        "duration": 2.189,
+        "style": {
+          "font": "Arial",
+          "size": 56,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 2,
+      "image": "aicap-render-jobs/AICAP-c46d62943edb4676a853/scene_02.jpg",
+      "start": 2.189,
+      "duration": 7.968,
+      "end": 10.157,
+      "motion": "zoom_out",
+      "subtitle": {
+        "enabled": true,
+        "text": "At its core, ML isn't about\nconscious artificial\nintelligence; it's about\noptimization algorithms…",
+        "start": 2.189,
+        "end": 10.157,
+        "duration": 7.968,
+        "style": {
+          "font": "Arial",
+          "size": 56,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 3,
+      "image": "aicap-render-jobs/AICAP-c46d62943edb4676a853/scene_03.jpg",
+      "start": 10.157,
+      "duration": 14.805,
+      "end": 24.962,
+      "motion": "pan_left",
+      "subtitle": {
+        "enabled": true,
+        "text": "Whether it's supervised learning\nusing labeled data to train\nneural networks, unsupervised\nlearning finding hidden clusters…",
+        "start": 10.157,
+        "end": 24.962,
+        "duration": 14.805,
+        "style": {
+          "font": "Arial",
+          "size": 56,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 4,
+      "image": "aicap-render-jobs/AICAP-c46d62943edb4676a853/scene_04.jpg",
+      "start": 24.962,
+      "duration": 7.526,
+      "end": 32.488,
+      "motion": "pan_right",
+      "subtitle": {
+        "enabled": true,
+        "text": "Understanding gradient descent,\nvector embeddings, and\ntransformer architectures is no\nlonger optional for tech…",
+        "start": 24.962,
+        "end": 32.488,
+        "duration": 7.526,
+        "style": {
+          "font": "Arial",
+          "size": 56,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    },
+    {
+      "id": 5,
+      "image": "aicap-render-jobs/AICAP-c46d62943edb4676a853/scene_05.jpg",
+      "start": 32.488,
+      "duration": 7.28,
+      "end": 39.768,
+      "motion": "zoom_in",
+      "subtitle": {
+        "enabled": true,
+        "text": "The transition from rule-based\nprogramming to probabilistic\nmodel training is the biggest\nparadigm shift in computer…",
+        "start": 32.488,
+        "end": 39.768,
+        "duration": 7.28,
+        "style": {
+          "font": "Arial",
+          "size": 56,
+          "color": "#FFFFFF",
+          "bold": true,
+          "italic": false,
+          "alignment": 2,
+          "position": {
+            "x": 540,
+            "y": 1580
+          },
+          "outline": 5,
+          "shadow": 3,
+          "margin": 90
+        }
+      }
+    }
+  ]
+}
