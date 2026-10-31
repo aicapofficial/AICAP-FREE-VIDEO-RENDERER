@@ -1,5 +1,7 @@
 name: AICAP Free Video Render V4
 
+run-name: AICAP Render ${{ inputs.job_id }}
+
 on:
   workflow_dispatch:
     inputs:
