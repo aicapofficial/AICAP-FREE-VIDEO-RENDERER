@@ -912,7 +912,7 @@ jobs:
                   "-r", str(fps),
                   "-c:a", "aac",
                   "-b:a", "192k",
-                  "-af", "aresample=async=1:first_pts=0",
+                  "-af", "loudnorm=I=-16:TP=-1.5:LRA=7:print_format=summary,aresample=async=1:first_pts=0",
                   "-t", f"{total_duration:.6f}",
                   "-movflags", "+faststart",
                   str(output)
